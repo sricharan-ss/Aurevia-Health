@@ -1,7 +1,18 @@
 "use client";
 
 import { AlertTriangle, ShieldAlert, FlaskConical } from "lucide-react";
-import type { AlertData } from "@/data/mockData";
+
+export interface AlertData {
+    id: string;
+    type: string;
+    severity: "low" | "medium" | "high";
+    title: string;
+    medications: string[];
+    sourceSentence: string;
+    reasoning: string;
+    confidence: "High" | "Medium" | "Low";
+    timestamp: string;
+}
 
 interface AlertCardProps {
     alert: AlertData;
@@ -37,7 +48,7 @@ const severityStyles: Record<string, { border: string; bg: string; text: string;
 
 export default function AlertCard({ alert, onClick }: AlertCardProps) {
     const Icon = iconMap[alert.type] || AlertTriangle;
-    const style = severityStyles[alert.severity];
+    const style = severityStyles[alert.severity] || severityStyles.low;
 
     return (
         <button
@@ -55,9 +66,11 @@ export default function AlertCard({ alert, onClick }: AlertCardProps) {
                             {alert.severity.toUpperCase()}
                         </span>
                     </div>
-                    <p className="text-xs text-muted leading-relaxed line-clamp-2">
-                        {alert.medicationsInvolved.join(" ↔ ")}
-                    </p>
+                    {alert.medications && alert.medications.length > 0 && (
+                        <p className="text-xs text-muted leading-relaxed line-clamp-2">
+                            {alert.medications.join(" ↔ ")}
+                        </p>
+                    )}
                     <p className="text-[11px] text-muted-light mt-1.5">
                         {alert.timestamp} · Click for details
                     </p>

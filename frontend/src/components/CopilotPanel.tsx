@@ -1,21 +1,27 @@
 "use client";
 
 import { MessageCircleQuestion, ShieldCheck, ShieldAlert } from "lucide-react";
-import type { AlertData } from "@/data/mockData";
 import AlertCard from "./AlertCard";
+
+export interface AlertData {
+    id: string;
+    type: string;
+    severity: "low" | "medium" | "high";
+    title: string;
+    medications: string[];
+    sourceSentence: string;
+    reasoning: string;
+    confidence: "High" | "Medium" | "Low";
+    timestamp: string;
+}
 
 interface CopilotPanelProps {
     alerts: AlertData[];
+    suggestedQuestions: string[];
     onAlertClick: (alert: AlertData) => void;
 }
 
-const suggestedQuestions = [
-    "Have you experienced any episodes of low blood sugar or dizziness?",
-    "Are you following the prescribed dietary plan?",
-    "Have you had any recent changes in your other medications?",
-];
-
-export default function CopilotPanel({ alerts, onAlertClick }: CopilotPanelProps) {
+export default function CopilotPanel({ alerts, suggestedQuestions, onAlertClick }: CopilotPanelProps) {
     return (
         <div className="p-4 space-y-4 h-full">
             {/* Suggested Questions */}
@@ -28,7 +34,7 @@ export default function CopilotPanel({ alerts, onAlertClick }: CopilotPanelProps
                     <p className="text-[11px] text-muted-light mt-0.5">AI-recommended follow-up questions</p>
                 </div>
                 <div className="p-3 space-y-2">
-                    {suggestedQuestions.length > 0 ? (
+                    {suggestedQuestions && suggestedQuestions.length > 0 ? (
                         suggestedQuestions.map((q, i) => (
                             <div
                                 key={i}
@@ -55,12 +61,12 @@ export default function CopilotPanel({ alerts, onAlertClick }: CopilotPanelProps
                     <p className="text-[11px] text-muted-light mt-0.5">Real-time clinical safety checks</p>
                 </div>
                 <div className="p-3">
-                    {alerts.length > 0 ? (
+                    {alerts && alerts.length > 0 ? (
                         <div className="space-y-3">
                             {alerts.map((alert) => (
                                 <AlertCard
                                     key={alert.id}
-                                    alert={alert}
+                                    alert={alert as any}
                                     onClick={() => onAlertClick(alert)}
                                 />
                             ))}

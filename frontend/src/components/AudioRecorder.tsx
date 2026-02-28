@@ -8,129 +8,118 @@ interface TranscriptChunk {
     text: string;
 }
 
-export default function AudioRecorder() {
+interface AudioRecorderProps {
+    patientId: string;
+    role: "doctor" | "patient";
+    onTranscriptChunk: (chunk: { speaker: "doctor" | "patient", text: string }) => void;
+    onProcessingComplete: (data: any) => void;
+}
+
+export default function AudioRecorder({ patientId, role, onTranscriptChunk, onProcessingComplete }: AudioRecorderProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
+    const socketRef = useRef<WebSocket | null>(null);
 
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
             mediaRecorderRef.current = mediaRecorder;
-            chunksRef.current = [];
 
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    chunksRef.current.push(e.data);
+            // Open WebSocket to Backend
+            const socket = new WebSocket('ws://localhost:3001/api/consultation/live');
+            socketRef.current = socket;
+
+            socket.onopen = () => {
+                console.log("WebSocket stream opened");
+                setIsRecording(true);
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'transcript') {
+                    const chunk = data.chunk;
+                    // Live UI Update
+                    onTranscriptChunk(chunk);
+                    // AI Intelligence Feed
+                    triggerAIProcessing(chunk);
                 }
             };
 
-            mediaRecorder.onstop = handleStopRecording;
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+                    socket.send(e.data);
+                }
+            };
 
-            mediaRecorder.start();
-            setIsRecording(true);
+            // Stream in 500ms chunks for real-time feel
+            mediaRecorder.start(500);
         } catch (err) {
-            console.error("Failed to acquire microphone access", err);
-            alert("Microphone access is required to use this feature.");
+            console.error("Mic access or WS failed:", err);
+            alert("Mic access is required for Ambient Clinical Copilot.");
         }
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
+        if (mediaRecorderRef.current) {
             mediaRecorderRef.current.stop();
-            setIsRecording(false);
-        }
-    };
-
-    const handleStopRecording = async () => {
-        // 1. Convert chunks to Blob
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        chunksRef.current = [];
-
-        // Stop all audio tracks from the microphone
-        if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
             mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
         }
+        if (socketRef.current) {
+            socketRef.current.close();
+        }
+        setIsRecording(false);
+    };
 
-        // 2. Wrap blob in FormData
-        const formData = new FormData();
-        formData.append("audio", audioBlob, "consultation.webm");
-
+    const triggerAIProcessing = async (chunk: TranscriptChunk) => {
         setIsProcessing(true);
-
         try {
-            // 3. Send audio to `/api/consultation/transcribe`
-            const transcribeRes = await fetch("http://localhost:3001/api/consultation/transcribe", {
+            const res = await fetch("http://localhost:3001/api/consultation/process", {
                 method: "POST",
-                body: formData,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    patientId,
+                    speaker: chunk.speaker,
+                    text: chunk.text,
+                }),
             });
 
-            if (!transcribeRes.ok) {
-                throw new Error("Failed to transcribe audio.");
+            if (res.ok) {
+                const data = await res.json();
+                onProcessingComplete(data);
             }
-
-            const { transcript, error } = await transcribeRes.json();
-
-            if (error || !transcript) {
-                throw new Error(error || "No transcript returned.");
-            }
-
-            // 4. Iterate over chunks and send to `/api/consultation/process`
-            for (const chunk of transcript as TranscriptChunk[]) {
-                const processRes = await fetch("http://localhost:3001/api/consultation/process", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        patientId: "pat_001", // Hardcoded mock patient for demo
-                        speaker: chunk.speaker,
-                        text: chunk.text,
-                    }),
-                });
-
-                if (!processRes.ok) {
-                    console.error("Failed to process chunk:", chunk);
-                }
-            }
-
-            // Notify the frontend to refresh the SOAP notes (if you had a global state block here)
-            // For this demo, we simply finish processing.
-
         } catch (err) {
-            console.error("Audio processing pipeline failed:", err);
-            alert("Error processing audio. See console for details.");
+            console.error("AI intelligence pipeline failed:", err);
         } finally {
             setIsProcessing(false);
         }
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-slate-50 border-slate-200">
-            <div className="flex items-center space-x-4">
-                {!isRecording ? (
-                    <button
-                        onClick={startRecording}
-                        disabled={isProcessing}
-                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                        {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
-                        <span>{isProcessing ? "Processing..." : "Start Recording"}</span>
-                    </button>
-                ) : (
-                    <button
-                        onClick={stopRecording}
-                        className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 animate-pulse"
-                    >
-                        <Square className="w-5 h-5 fill-current" />
-                        <span>Stop Recording</span>
-                    </button>
-                )}
-            </div>
-            {isRecording && (
-                <p className="mt-3 text-sm text-red-500 font-medium animate-pulse">
-                    Recording live consultation...
-                </p>
+        <div className="flex items-center gap-3">
+            {!isRecording ? (
+                <button
+                    onClick={startRecording}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-xs font-medium cursor-pointer"
+                >
+                    <Mic className="w-3.5 h-3.5" />
+                    Connect Ambient Mic
+                </button>
+            ) : (
+                <button
+                    onClick={stopRecording}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-alert text-white rounded-lg hover:bg-alert/90 animate-pulse transition-colors text-xs font-medium cursor-pointer"
+                >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    Disconnect Mic
+                </button>
+            )}
+            {(isRecording || isProcessing) && (
+                <span className="text-[10px] text-alert font-bold tracking-tight animate-pulse uppercase flex items-center gap-2">
+                    {isProcessing && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {isProcessing ? "Gemini Reasoning..." : "Ambient Listening..."}
+                </span>
             )}
         </div>
     );
