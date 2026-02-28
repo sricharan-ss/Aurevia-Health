@@ -7,7 +7,7 @@ export class GeminiEngine {
     /**
      * Processes a live transcript chunk to provide clinical insights
      */
-    async processLiveChunk(transcript: TranscriptChunk[]): Promise<Partial<ConsultationResponse>> {
+    async processLiveChunk(newChunks: TranscriptChunk[], previousSummary?: ConsultationResponse): Promise<Partial<ConsultationResponse>> {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey || apiKey === 'YOUR_GEMINI_KEY_HERE') {
             return this.getMockLiveInsights();
@@ -18,15 +18,38 @@ export class GeminiEngine {
         try {
             const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
             const model = genAI.getGenerativeModel({ model: modelName });
-            const transcriptText = transcript.map(t => `${t.speaker.toUpperCase()}: ${t.text}`).join("\n");
+
+            const transcriptDelta = newChunks.map(t => `${t.speaker.toUpperCase()}: ${t.text}`).join("\n");
+
+            // ARCHITECTURAL PROTECTION: Check if the summary is getting too long (> 250 words)
+            const summaryWordCount = previousSummary?.patientSummary.split(/\s+/).length || 0;
+            const isCompressionNeeded = summaryWordCount > 250;
+
+            const previousStateText = previousSummary
+                ? `PREVIOUS AI STATE:
+                   SOAP: ${JSON.stringify(previousSummary.soap)}
+                   SUMMARY (Length: ${summaryWordCount} words): ${previousSummary.patientSummary}`
+                : "NO PREVIOUS STATE (START OF CONSULTATION)";
 
             const prompt = `
             You are a clinical decision support assistant.
-            Analyze the following doctor-patient conversation segment:
+            ${previousStateText}
 
-            ${transcriptText}
+            NEW CONVERSATION LINES (LAST 30 SECONDS):
+            ${transcriptDelta}
 
-            Return exactly a JSON object (no markdown, no extra text) with this structure:
+            STABILITY RULES:
+            1. Do NOT remove existing stable medical facts (diagnoses, confirmed medications, history).
+            2. Only update a section if new information expands on it or explicitly corrects it.
+            3. ${isCompressionNeeded ? "CRITICAL: The summary is reaching its length limit. COMPRESS it now into a super-concise structured summary while preserving all 100% of the medical facts. Use medical shorthand (e.g., 'pt' for patient, 'dx' for diagnosis) if needed." : "Refine and update based on the new lines."}
+
+            TASK:
+            1. Update the existing SOAP note based ONLY on the NEW conversation lines.
+            2. Refine the 1-sentence patient summary (Capped at 50 words).
+            3. Detect any NEW clinical alerts (drug interactions, red flags).
+            4. Suggest 2 relevant follow-up questions for the doctor.
+
+            Return exactly a JSON object (no markdown) with this structure:
             {
               "suggestedQuestions": ["string"],
               "potentialAlerts": [
@@ -120,38 +143,46 @@ export class GeminiEngine {
                 soap: parsed.soap,
                 aiSummary: parsed.aiSummary
             };
-        } catch (err) {
+        } catch (err: any) {
             console.error("Gemini Error (Final):", err);
-            return this.getMockFinalReport();
+            return this.getMockFinalReport(err.toString());
         }
     }
 
     private getMockLiveInsights(errStr?: string): Partial<ConsultationResponse> {
+        const isRateLimit = errStr?.includes("429") || errStr?.includes("Quota exceeded");
+        const isNotFound = errStr?.includes("404");
         return {
             soap: {
-                subjective: ["Patient reports symptoms"],
-                objective: ["Vitals pending"],
-                assessment: ["Needs further evaluation"],
-                plan: ["Continue mock monitoring"]
+                subjective: [],
+                objective: [],
+                assessment: [],
+                plan: []
             },
-            suggestedQuestions: ["How long have you felt this way?", "Does anything make it better?"],
+            suggestedQuestions: isRateLimit ? ["AI Reasoning Throttled"] : (isNotFound ? ["Error: Model Not Found"] : ["Listening for patient details..."]),
             alerts: [],
-            patientSummary: `Patient is describing symptoms. AI is in mock mode. Error: ${errStr || "None"}`
+            patientSummary: isRateLimit
+                ? "Gemini API Quota Exceeded. Clinical reasoning is temporarily paused. Please wait 60 seconds."
+                : (isNotFound ? `Model version error (404). Check your .env file. Error: ${errStr}` : `AI is in mock mode. Error: ${errStr || "None"}`)
         };
     }
 
-    private getMockFinalReport(): { soap: SOAPNote, aiSummary: any } {
+    private getMockFinalReport(errStr?: string): { soap: SOAPNote, aiSummary: any } {
+        const isRateLimit = errStr?.includes("429") || errStr?.includes("Quota exceeded");
+        const isNotFound = errStr?.includes("404");
         return {
             soap: {
-                subjective: ["Patient reports chest pain"],
-                objective: ["Vitals stable"],
-                assessment: ["Rule out GERD"],
-                plan: ["ECG ordered"]
+                subjective: ["Consultation finished"],
+                objective: ["See live transcript"],
+                assessment: ["Needs manual review"],
+                plan: ["Final AI generation was rate-limited or failed"]
             },
             aiSummary: {
-                narrative: "The patient presented with symptoms and the doctor suggested follow-up tests.",
+                narrative: isRateLimit
+                    ? "Summary generation failed due to API rate limits (Gemini 429). The full transcript is available below for manual review."
+                    : (isNotFound ? `Generation failed due to incorrect model (404). Error: ${errStr}` : "Mock Summary: The consultation concluded successfully."),
                 medications: [],
-                warnings: ["Awaiting lab results"]
+                warnings: isRateLimit ? ["AI Engine Rate Limited"] : ["Review transcript manually"]
             }
         };
     }

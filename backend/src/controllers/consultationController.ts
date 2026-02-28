@@ -25,10 +25,10 @@ export const startConsultation = (req: Request, res: Response) => {
 };
 
 export const processConsultationChunk = async (req: Request, res: Response) => {
-    const { patientId, speaker, text } = req.body;
+    const { patientId, chunks } = req.body;
 
-    if (!patientId || !speaker || !text) {
-        return res.status(400).json({ error: 'patientId, speaker, and text are required' });
+    if (!patientId || !chunks || !Array.isArray(chunks) || chunks.length === 0) {
+        return res.status(400).json({ error: 'patientId and an array of chunks are required' });
     }
 
     if (!activeConsultations[patientId]) {
@@ -43,11 +43,18 @@ export const processConsultationChunk = async (req: Request, res: Response) => {
     const state = activeConsultations[patientId];
     const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
-    state.transcript.push({ speaker, text, timestamp });
+    for (const chunk of chunks) {
+        state.transcript.push({
+            speaker: chunk.speaker,
+            text: chunk.text,
+            timestamp
+        });
+    }
 
     try {
-        // Run Gemini Intelligence
-        const insights = await geminiEngine.processLiveChunk(state.transcript);
+        // Run Gemini Intelligence - INCREMENTAL/DELTA MODE
+        // We only pass the NEW chunks to the engine, plus the LAST cumulative summary
+        const insights = await geminiEngine.processLiveChunk(chunks, state.lastAIPushSummary);
 
         const response: ConsultationResponse = {
             soap: insights.soap || { subjective: [], objective: [], assessment: [], plan: [] },
@@ -55,6 +62,9 @@ export const processConsultationChunk = async (req: Request, res: Response) => {
             patientSummary: insights.patientSummary || "",
             suggestedQuestions: insights.suggestedQuestions || []
         };
+
+        // Cache this as the "New Previous State" for the next 30s flush
+        state.lastAIPushSummary = response;
 
         res.json(response);
     } catch (err) {

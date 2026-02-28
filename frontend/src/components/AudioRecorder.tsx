@@ -20,6 +20,8 @@ export default function AudioRecorder({ patientId, role, onTranscriptChunk, onPr
     const [isProcessing, setIsProcessing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
+    const chunkBufferRef = useRef<TranscriptChunk[]>([]);
+    const aiThrottleRef = useRef<number>(0);
 
     const startRecording = async () => {
         try {
@@ -42,8 +44,10 @@ export default function AudioRecorder({ patientId, role, onTranscriptChunk, onPr
                     const chunk = data.chunk;
                     // Live UI Update
                     onTranscriptChunk(chunk);
-                    // AI Intelligence Feed
-                    triggerAIProcessing(chunk);
+                    // Add to local buffer for 30s batching
+                    chunkBufferRef.current.push(chunk);
+                    // AI Intelligence Feed Array
+                    triggerAIProcessing();
                 }
             };
 
@@ -72,16 +76,28 @@ export default function AudioRecorder({ patientId, role, onTranscriptChunk, onPr
         setIsRecording(false);
     };
 
-    const triggerAIProcessing = async (chunk: TranscriptChunk) => {
+    const triggerAIProcessing = async () => {
+        // Ultra-Stability Debounce: Every 30 seconds (2 RPM, strictly within Free Tier)
+        const now = Date.now();
+
+        if (chunkBufferRef.current.length === 0 || now - aiThrottleRef.current < 30000) {
+            return;
+        }
+
         setIsProcessing(true);
+        aiThrottleRef.current = now;
+
+        // Take a snapshot of the buffer and clear it for the next window
+        const chunksToSend = [...chunkBufferRef.current];
+        chunkBufferRef.current = [];
+
         try {
             const res = await fetch("http://localhost:3001/api/consultation/process", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     patientId,
-                    speaker: chunk.speaker,
-                    text: chunk.text,
+                    chunks: chunksToSend
                 }),
             });
 

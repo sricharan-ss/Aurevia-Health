@@ -40,6 +40,9 @@ export default function LiveConsultationLayout() {
 
     // Initialize consultation on backend
     useEffect(() => {
+        // Clear old summary state to prevent data bleed
+        sessionStorage.removeItem(`session_${patientId}`);
+
         fetch("http://localhost:3001/api/consultation/start", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

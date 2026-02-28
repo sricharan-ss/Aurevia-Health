@@ -38,6 +38,7 @@ export interface ConsultationState {
     transcript: TranscriptChunk[];
     doctorPrescriptions: string[];
     extractedSymptoms: string[];
+    lastAIPushSummary?: ConsultationResponse; // Rolling state for delta updates
 }
 
 export interface ConsultationResponse {
