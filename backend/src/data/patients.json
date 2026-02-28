@@ -1,0 +1,52 @@
+[
+    {
+        "id": "pat_001",
+        "name": "Evelyn Harper",
+        "conditions": [
+            "Hypertension",
+            "Atrial Fibrillation"
+        ],
+        "medications": [
+            "Lisinopril",
+            "Warfarin"
+        ],
+        "allergies": [
+            "Penicillin"
+        ],
+        "lastAbnormalLab": "Elevated INR (3.2) - 2 weeks ago",
+        "visitReason": "Routine checkup and occasional headaches"
+    },
+    {
+        "id": "pat_002",
+        "name": "Marcus Chen",
+        "conditions": [
+            "Type 2 Diabetes",
+            "Asthma"
+        ],
+        "medications": [
+            "Metformin",
+            "Albuterol Inhaler"
+        ],
+        "allergies": [
+            "None"
+        ],
+        "lastAbnormalLab": "HbA1c 7.8% - 1 month ago",
+        "visitReason": "Refill for asthma inhaler and follow-up on blood sugar"
+    },
+    {
+        "id": "pat_003",
+        "name": "Sarah Jenkins",
+        "conditions": [
+            "Osteoarthritis"
+        ],
+        "medications": [
+            "Ibuprofen",
+            "Calcium Supplements"
+        ],
+        "allergies": [
+            "Sulfa Drugs"
+        ],
+        "lastAbnormalLab": "Mildly elevated AST - 3 months ago",
+        "visitReason": "Right knee pain worsening over the last week"
+    }
+]

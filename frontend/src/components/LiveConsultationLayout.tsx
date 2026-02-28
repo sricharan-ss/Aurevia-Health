@@ -7,6 +7,7 @@ import { patients, transcriptMessages, alertsData, type Patient } from "@/data/m
 import TranscriptPanel from "./TranscriptPanel";
 import CopilotPanel from "./CopilotPanel";
 import ExplainabilityModal from "./ExplainabilityModal";
+import AudioRecorder from "./AudioRecorder";
 
 function getPatientById(id: string): Patient | undefined {
     return patients.find((p) => p.id === id);
@@ -52,6 +53,9 @@ export default function LiveConsultationLayout() {
                     </div>
                 </div>
                 <div className="flex items-center gap-5">
+                    {/* Inject AudioRecorder Here */}
+                    <AudioRecorder />
+
                     <div className="flex items-center gap-2 text-xs text-muted">
                         <Clock className="w-3.5 h-3.5" />
                         <span className="font-mono font-medium text-foreground">{formatTime(elapsed)}</span>
