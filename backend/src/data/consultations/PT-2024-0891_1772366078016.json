@@ -1,0 +1,37 @@
+{
+  "patient": {
+    "id": "PT-2024-0891",
+    "name": "Rajesh Kumar",
+    "age": 58,
+    "gender": "Male",
+    "bloodGroup": "B+",
+    "conditions": [
+      "Type 2 Diabetes Mellitus",
+      "Hypertension Stage II"
+    ],
+    "medications": [
+      "Metformin 500mg BD",
+      "Amlodipine 5mg OD",
+      "Atorvastatin 20mg HS"
+    ],
+    "allergies": [
+      "Sulfonamides"
+    ],
+    "lastAbnormalLab": "HbA1c — 8.2% (elevated)",
+    "visitReason": "Follow-up – uncontrolled blood sugar"
+  },
+  "transcript": [],
+  "report": {
+    "soap": {
+      "subjective": [],
+      "objective": [],
+      "assessment": [],
+      "plan": []
+    },
+    "aiSummary": {
+      "narrative": "No clinical findings or discussions were provided in the transcript to synthesize a professional, structured clinical document.",
+      "medications": [],
+      "warnings": []
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "patient": {
+    "id": "PT-2024-0891",
+    "name": "Rajesh Kumar",
+    "age": 58,
+    "gender": "Male",
+    "bloodGroup": "B+",
+    "conditions": [
+      "Type 2 Diabetes Mellitus",
+      "Hypertension Stage II"
+    ],
+    "medications": [
+      "Metformin 500mg BD",
+      "Amlodipine 5mg OD",
+      "Atorvastatin 20mg HS"
+    ],
+    "allergies": [
+      "Sulfonamides"
+    ],
+    "lastAbnormalLab": "HbA1c — 8.2% (elevated)",
+    "visitReason": "Follow-up – uncontrolled blood sugar"
+  },
+  "transcript": [],
+  "report": {
+    "soap": {
+      "subjective": [],
+      "objective": [],
+      "assessment": [],
+      "plan": []
+    },
+    "aiSummary": {
+      "narrative": "Patient has a history of Type 2 Diabetes Mellitus and Hypertension Stage II, currently taking Metformin, Amlodipine, and Atorvastatin, with an allergy to Sulfonamides. However, no new clinical findings or discussions were provided in the transcript to update the assessment or plan.",
+      "medications": [
+        "Metformin 500mg BD: Continue",
+        "Amlodipine 5mg OD: Continue",
+        "Atorvastatin 20mg HS: Continue"
+      ],
+      "warnings": [
+        "Caution with new medications due to Sulfonamide allergy"
+      ]
+    }
+  }
+}
