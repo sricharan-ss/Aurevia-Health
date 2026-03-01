@@ -1,0 +1,122 @@
+{
+  "patient": {
+    "id": "PT-2024-0894",
+    "name": "Sneha Patel",
+    "age": 45,
+    "gender": "Female",
+    "bloodGroup": "AB+",
+    "conditions": [
+      "Major Depressive Disorder",
+      "Hypothyroidism"
+    ],
+    "medications": [
+      "Sertraline 100mg OD",
+      "Levothyroxine 75mcg OD"
+    ],
+    "allergies": [],
+    "lastAbnormalLab": "TSH — 6.8 mIU/L (elevated)",
+    "visitReason": "Medication review – persistent fatigue"
+  },
+  "transcript": [
+    {
+      "speaker": "doctor",
+      "text": "Good morning. What brings you in today?",
+      "timestamp": "20:23"
+    },
+    {
+      "speaker": "patient",
+      "text": "Good morning, doctor. I've just been feeling really tired lately.",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "patient",
+      "text": "And when I check my sugars at home, the numbers have been higher than usual.",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Since when have you been noticing these changes?",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "patient",
+      "text": "It's been about three weeks now.",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Any changes in the routine lately?",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "patient",
+      "text": "Yes.",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "patient",
+      "text": "My daughter's wedding was a few weeks ago, so I've been eating more sweets and carbs than usual.",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Your BP is one forty six one ninety. I'm adding a couple of more medicines.",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "patient",
+      "text": "Is that a new bill?",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "patient",
+      "text": "Do I take it with metformin?",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "patient",
+      "text": "Any side effects?",
+      "timestamp": "20:24"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Yes. Take it with the other medicine that you are using right now.",
+      "timestamp": "20:24"
+    }
+  ],
+  "report": {
+    "soap": {
+      "subjective": [
+        "Patient reports feeling tired lately",
+        "Patient has been noticing higher than usual sugar numbers at home",
+        "Recent increase in sweets and carbs consumption due to daughter's wedding"
+      ],
+      "objective": [
+        "Blood Pressure: 146/90",
+        "Patient is currently taking Sertraline 100mg OD and Levothyroxine 75mcg OD"
+      ],
+      "assessment": [
+        "Hyperglycemia",
+        "Hypertension"
+      ],
+      "plan": [
+        "Add new medication for hypertension and hyperglycemia management",
+        "Take new medication with current medications, including metformin if prescribed",
+        "Follow up with doctor to monitor blood sugar and blood pressure levels",
+        "Recommendation to reduce sweets and carbs intake"
+      ]
+    },
+    "aiSummary": {
+      "narrative": "The patient presents with symptoms of tiredness and elevated sugar numbers, which may be related to recent dietary changes. The doctor has identified hypertension and hyperglycemia, and a new medication is being added to the patient's current regimen of Sertraline and Levothyroxine. The patient should follow up with the doctor to monitor their condition and consider reducing their intake of sweets and carbs.",
+      "medications": [
+        "New medication for hypertension and hyperglycemia (exact name not specified in transcript)",
+        "Continue Sertraline 100mg OD",
+        "Continue Levothyroxine 75mcg OD"
+      ],
+      "warnings": [
+        "Monitor for potential interactions between new medication and current medications",
+        "Caution with increased sugar intake and its impact on hyperglycemia management"
+      ]
+    }
+  }
+}
