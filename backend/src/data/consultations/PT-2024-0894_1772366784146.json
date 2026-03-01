@@ -1,0 +1,34 @@
+{
+  "patient": {
+    "id": "PT-2024-0894",
+    "name": "Sneha Patel",
+    "age": 45,
+    "gender": "Female",
+    "bloodGroup": "AB+",
+    "conditions": [
+      "Major Depressive Disorder",
+      "Hypothyroidism"
+    ],
+    "medications": [
+      "Sertraline 100mg OD",
+      "Levothyroxine 75mcg OD"
+    ],
+    "allergies": [],
+    "lastAbnormalLab": "TSH — 6.8 mIU/L (elevated)",
+    "visitReason": "Medication review – persistent fatigue"
+  },
+  "transcript": [],
+  "report": {
+    "soap": {
+      "subjective": [],
+      "objective": [],
+      "assessment": [],
+      "plan": []
+    },
+    "aiSummary": {
+      "narrative": "No clinical transcript was provided to analyze the patient's condition and generate a structured SOAP note.",
+      "medications": [],
+      "warnings": []
+    }
+  }
+}
