@@ -1,52 +1,121 @@
 [
     {
-        "id": "pat_001",
-        "name": "Evelyn Harper",
+        "id": "PT-2024-0891",
+        "name": "Rajesh Kumar",
+        "age": 58,
+        "gender": "Male",
+        "bloodGroup": "B+",
         "conditions": [
-            "Hypertension",
+            "Type 2 Diabetes Mellitus",
+            "Hypertension Stage II"
+        ],
+        "medications": [
+            "Metformin 500mg BD",
+            "Amlodipine 5mg OD",
+            "Atorvastatin 20mg HS"
+        ],
+        "allergies": [
+            "Sulfonamides"
+        ],
+        "lastAbnormalLab": "HbA1c — 8.2% (elevated)",
+        "visitReason": "Follow-up – uncontrolled blood sugar"
+    },
+    {
+        "id": "PT-2024-0892",
+        "name": "Priya Sharma",
+        "age": 34,
+        "gender": "Female",
+        "bloodGroup": "O+",
+        "conditions": [
+            "Asthma (moderate persistent)"
+        ],
+        "medications": [
+            "Budesonide-Formoterol 200/6 mcg BD",
+            "Montelukast 10mg OD"
+        ],
+        "allergies": [
+            "Aspirin",
+            "NSAIDs"
+        ],
+        "lastAbnormalLab": "Eosinophils — 8% (elevated)",
+        "visitReason": "Acute exacerbation – chest tightness"
+    },
+    {
+        "id": "PT-2024-0893",
+        "name": "Anand Mehta",
+        "age": 72,
+        "gender": "Male",
+        "bloodGroup": "A+",
+        "conditions": [
+            "Chronic Kidney Disease Stage 3b",
             "Atrial Fibrillation"
         ],
         "medications": [
-            "Lisinopril",
-            "Warfarin"
+            "Rivaroxaban 15mg OD",
+            "Furosemide 40mg OD",
+            "Losartan 50mg OD"
         ],
         "allergies": [
             "Penicillin"
         ],
-        "lastAbnormalLab": "Elevated INR (3.2) - 2 weeks ago",
-        "visitReason": "Routine checkup and occasional headaches"
+        "lastAbnormalLab": "eGFR — 38 mL/min (low)",
+        "visitReason": "Quarterly renal function review"
     },
     {
-        "id": "pat_002",
-        "name": "Marcus Chen",
+        "id": "PT-2024-0894",
+        "name": "Sneha Patel",
+        "age": 45,
+        "gender": "Female",
+        "bloodGroup": "AB+",
         "conditions": [
-            "Type 2 Diabetes",
-            "Asthma"
+            "Major Depressive Disorder",
+            "Hypothyroidism"
         ],
         "medications": [
-            "Metformin",
-            "Albuterol Inhaler"
+            "Sertraline 100mg OD",
+            "Levothyroxine 75mcg OD"
         ],
-        "allergies": [
-            "None"
-        ],
-        "lastAbnormalLab": "HbA1c 7.8% - 1 month ago",
-        "visitReason": "Refill for asthma inhaler and follow-up on blood sugar"
+        "allergies": [],
+        "lastAbnormalLab": "TSH — 6.8 mIU/L (elevated)",
+        "visitReason": "Medication review – persistent fatigue"
     },
     {
-        "id": "pat_003",
-        "name": "Sarah Jenkins",
+        "id": "PT-2024-0895",
+        "name": "Mohammed Ismail",
+        "age": 63,
+        "gender": "Male",
+        "bloodGroup": "O-",
         "conditions": [
+            "COPD (GOLD Stage III)",
             "Osteoarthritis"
         ],
         "medications": [
-            "Ibuprofen",
-            "Calcium Supplements"
+            "Tiotropium 18mcg OD",
+            "Salbutamol PRN",
+            "Diclofenac 50mg BD"
         ],
         "allergies": [
-            "Sulfa Drugs"
+            "Codeine"
         ],
-        "lastAbnormalLab": "Mildly elevated AST - 3 months ago",
-        "visitReason": "Right knee pain worsening over the last week"
+        "lastAbnormalLab": "FEV1 — 42% predicted (severe)",
+        "visitReason": "Worsening dyspnea on exertion"
+    },
+    {
+        "id": "PT-2024-0896",
+        "name": "Kavitha Reddy",
+        "age": 29,
+        "gender": "Female",
+        "bloodGroup": "B-",
+        "conditions": [
+            "Iron Deficiency Anemia",
+            "PCOS"
+        ],
+        "medications": [
+            "Ferrous Sulfate 325mg OD",
+            "Metformin 500mg OD"
+        ],
+        "allergies": [],
+        "lastAbnormalLab": "Hemoglobin — 9.2 g/dL (low)",
+        "visitReason": "Follow-up – fatigue and dizziness"
     }
 ]

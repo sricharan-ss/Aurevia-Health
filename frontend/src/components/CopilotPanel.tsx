@@ -35,7 +35,7 @@ export default function CopilotPanel({ alerts, suggestedQuestions, onAlertClick 
                         ))
                     ) : (
                         <div className="py-6 text-center">
-                            <p className="text-xs text-muted-light">No suggested questions at this time</p>
+                            <p className="text-[11px] text-muted-light italic">Generating relevant questions...</p>
                         </div>
                     )}
                 </div>

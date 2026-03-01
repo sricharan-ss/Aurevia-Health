@@ -4,11 +4,13 @@ import { useSearchParams } from "next/navigation";
 import {
     User, Clock, CheckCircle2, Pill, AlertTriangle,
     ClipboardList, Stethoscope, Brain, ListChecks,
-    MessageSquare, ShieldAlert, ArrowLeft, Download
+    MessageSquare, ShieldAlert, ArrowLeft, Download,
+    Loader2, AlertCircle
 } from "lucide-react";
 import { patients, soapNote, transcriptMessages, alertsData, patientSummary } from "@/data/mockData";
 import type { Patient, AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
 import Link from "next/link";
+import { format } from "date-fns";
 
 export default function ConsultationSummary() {
     const searchParams = useSearchParams();
@@ -16,21 +18,150 @@ export default function ConsultationSummary() {
     const durationSeconds = parseInt(searchParams.get("duration") || "387", 10);
     const patient = patients.find((p) => p.id === patientId) || patients[0];
 
+    const [isExporting, setIsExporting] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [sessionData, setSessionData] = useState<any>(null);
+    const [isLoadingReport, setIsLoadingReport] = useState(false);
 
     useEffect(() => {
         setMounted(true);
+        const reportId = searchParams.get("id");
         const stored = sessionStorage.getItem(`session_${patientId}`);
+
         if (stored) {
+            console.log("[Summary] Loading from session storage");
             setSessionData(JSON.parse(stored));
+        } else if (reportId) {
+            console.log("[Summary] Session storage empty, fetching from backend:", reportId);
+            setIsLoadingReport(true);
+            fetch(`http://localhost:3001/api/consultation/report/${reportId}`)
+                .then(res => res.json())
+                .then(data => {
+                    // Adapt backend format to summary components
+                    setSessionData({
+                        summary: data.report.aiSummary.narrative,
+                        soap: data.report.soap,
+                        medications: data.report.aiSummary.medications,
+                        warnings: data.report.aiSummary.warnings
+                    });
+                })
+                .catch(err => console.error("[Summary] Fetch failed:", err))
+                .finally(() => setIsLoadingReport(false));
         }
-    }, [patientId]);
+    }, [patientId, searchParams]);
 
     const formatDuration = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m} min ${s} sec`;
+    };
+
+    if (!mounted || isLoadingReport) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-muted">
+                <Loader2 className="w-10 h-10 animate-spin mb-4 opacity-20" />
+                <p className="text-sm font-medium">Fetching consultation report...</p>
+            </div>
+        );
+    }
+
+    if (!sessionData) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-muted">
+                <AlertCircle className="w-10 h-10 mb-4 opacity-20" />
+                <p className="text-sm font-medium">Report not found</p>
+                <Link href="/consultation" className="mt-4 text-xs text-primary hover:underline">Return to Dashboard</Link>
+            </div>
+        );
+    }
+
+    const generatePDF = async () => {
+        setIsExporting(true);
+        try {
+            const { jsPDF } = await import("jspdf");
+            const autoTable = (await import("jspdf-autotable")).default;
+
+            const doc = new jsPDF();
+            const timestamp = format(new Date(), "PPpp");
+
+            // Header
+            doc.setFontSize(22);
+            doc.setTextColor(37, 99, 235); // primary
+            doc.text("Aurevia Health", 14, 22);
+
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text("Clinical Consultation Summary", 14, 28);
+            doc.text(`Generated: ${timestamp}`, 150, 22);
+
+            // Patient Info Box
+            doc.setDrawColor(230);
+            doc.setFillColor(249, 250, 251);
+            doc.roundedRect(14, 35, 182, 30, 3, 3, "FD");
+
+            doc.setFontSize(12);
+            doc.setTextColor(0);
+            doc.setFont("helvetica", "bold");
+            doc.text(patient.name, 20, 45);
+
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100);
+            doc.text(`ID: ${patient.id}  |  Age: ${patient.age}  |  Gender: ${patient.gender}`, 20, 52);
+            doc.text(`Visit Reason: ${patient.visitReason}`, 20, 59);
+
+            // SOAP Note Sections
+            let yPos = 75;
+            const sections = [
+                { title: "Subjective", data: currentSoap.subjective },
+                { title: "Objective", data: currentSoap.objective },
+                { title: "Assessment", data: currentSoap.assessment },
+                { title: "Plan", data: currentSoap.plan }
+            ];
+
+            sections.forEach(section => {
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(37, 99, 235);
+                doc.text(section.title.toUpperCase(), 14, yPos);
+
+                autoTable(doc, {
+                    startY: yPos + 2,
+                    body: section.data.map((item: string) => [item]),
+                    theme: "plain",
+                    styles: { fontSize: 9, cellPadding: 1, textColor: [50, 50, 50] },
+                    columnStyles: { 0: { cellWidth: 180 } },
+                    margin: { left: 14 }
+                });
+
+                yPos = (doc as any).lastAutoTable.finalY + 8;
+            });
+
+            // Summary Table
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text("AI SUMMARY & RECOMMENDATIONS", 14, yPos);
+
+            autoTable(doc, {
+                startY: yPos + 2,
+                head: [["Category", "Details"]],
+                body: [
+                    ["Narrative", sessionData?.summary || "N/A"],
+                    ["Medications", currentSummary.medications.join(", ")],
+                    ["Warnings", currentSummary.warnings.join(", ")]
+                ],
+                theme: "striped",
+                headStyles: { fillColor: [37, 99, 235], fontSize: 10 },
+                styles: { fontSize: 9 },
+                columnStyles: { 0: { cellWidth: 30, fontStyle: "bold" }, 1: { cellWidth: 150 } }
+            });
+
+            doc.save(`Aurevia_Summary_${patient.name.replace(/\s/g, "_")}.pdf`);
+        } catch (err) {
+            console.error("PDF generation failed:", err);
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     if (!mounted) return null;
@@ -39,11 +170,11 @@ export default function ConsultationSummary() {
     const currentSoap = sessionData?.soap || soapNote;
     const currentTranscript = sessionData?.transcript || transcriptMessages;
     const currentAlerts = sessionData?.alerts || alertsData;
-    const currentSummary = sessionData?.summary ? {
-        diagnosis: [sessionData.summary], // Simplified wrap for summary string
-        medications: patientSummary.medications,
-        warnings: patientSummary.warnings
-    } : patientSummary;
+    const currentSummary = {
+        diagnosis: sessionData?.summary ? [sessionData.summary] : patientSummary.diagnosis,
+        medications: sessionData?.medications || patientSummary.medications,
+        warnings: sessionData?.warnings || patientSummary.warnings
+    };
 
     return (
         <div className="max-w-4xl mx-auto space-y-5">
@@ -248,10 +379,12 @@ export default function ConsultationSummary() {
                     Back to Patients
                 </Link>
                 <button
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors cursor-pointer"
+                    onClick={generatePDF}
+                    disabled={isExporting}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50"
                 >
-                    <Download className="w-3.5 h-3.5" />
-                    Export Summary
+                    {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    {isExporting ? "Exporting..." : "Export Summary"}
                 </button>
             </div>
         </div>

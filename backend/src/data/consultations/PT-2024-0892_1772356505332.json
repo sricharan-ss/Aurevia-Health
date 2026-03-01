@@ -1,0 +1,125 @@
+{
+  "patient": {
+    "id": "PT-2024-0892",
+    "name": "Priya Sharma",
+    "age": 34,
+    "gender": "Female",
+    "bloodGroup": "O+",
+    "conditions": [
+      "Asthma (moderate persistent)"
+    ],
+    "medications": [
+      "Budesonide-Formoterol 200/6 mcg BD",
+      "Montelukast 10mg OD"
+    ],
+    "allergies": [
+      "Aspirin",
+      "NSAIDs"
+    ],
+    "lastAbnormalLab": "Eosinophils — 8% (elevated)",
+    "visitReason": "Acute exacerbation – chest tightness"
+  },
+  "transcript": [
+    {
+      "speaker": "doctor",
+      "text": "Hello, Priya Sharma. This is your doctor speaking.",
+      "timestamp": "14:41"
+    },
+    {
+      "speaker": "patient",
+      "text": "Hello, doctor. I have",
+      "timestamp": "14:42"
+    },
+    {
+      "speaker": "patient",
+      "text": "fever.",
+      "timestamp": "14:42"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Okay. How long have you been having this fever for?",
+      "timestamp": "14:42"
+    },
+    {
+      "speaker": "patient",
+      "text": "Three days, doctor.",
+      "timestamp": "14:42"
+    },
+    {
+      "speaker": "patient",
+      "text": "I also have throat infection.",
+      "timestamp": "14:42"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Okay. How bad is your throat inflection?",
+      "timestamp": "14:42"
+    },
+    {
+      "speaker": "patient",
+      "text": "I cannot swallow food with",
+      "timestamp": "14:42"
+    },
+    {
+      "speaker": "patient",
+      "text": "ease.",
+      "timestamp": "14:43"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Okay.",
+      "timestamp": "14:43"
+    },
+    {
+      "speaker": "doctor",
+      "text": "You have any other symptoms?",
+      "timestamp": "14:43"
+    },
+    {
+      "speaker": "patient",
+      "text": "Headache and fever, doctor.",
+      "timestamp": "14:43"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Can you describe the severity of your headache?",
+      "timestamp": "14:43"
+    },
+    {
+      "speaker": "patient",
+      "text": "I cannot sleep because of fever, doctor.",
+      "timestamp": "14:43"
+    }
+  ],
+  "report": {
+    "soap": {
+      "subjective": [
+        "Patient reports having a fever for three days",
+        "Patient has a throat infection, making it difficult to swallow food",
+        "Patient experiences headache and fever, affecting sleep"
+      ],
+      "objective": [
+        "Fever for three days",
+        "Throat infection",
+        "Headache"
+      ],
+      "assessment": [
+        "Throat infection",
+        "Fever"
+      ],
+      "plan": [
+        "Further evaluation and treatment of throat infection and fever are needed"
+      ]
+    },
+    "aiSummary": {
+      "narrative": "The patient, Priya Sharma, presented with a fever for three days, a throat infection, and a headache, which are affecting her ability to swallow food and sleep. There is no discussion about adjusting her current medications (Budesonide-Formoterol 200/6 mcg BD, Montelukast 10mg OD) during this consultation.",
+      "medications": [
+        "Continue Budesonide-Formoterol 200/6 mcg BD",
+        "Continue Montelukast 10mg OD"
+      ],
+      "warnings": [
+        "Caution is advised when prescribing any new medications due to patient's allergies to Aspirin and NSAIDs"
+      ]
+    }
+  }
+}

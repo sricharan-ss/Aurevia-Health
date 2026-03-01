@@ -209,21 +209,26 @@ export default function LiveConsultationLayout() {
                 </div>
             </div>
 
-            {/* Main content — 2-pane split (Transcript & Copilot) */}
+            {/* Main content — 3-pane split (Transcript, SOAP, Copilot) */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Left 60% — Transcript */}
-                <div className="w-[60%] border-r border-border flex flex-col">
+                {/* Left 35% — Transcript */}
+                <div className="w-[35%] border-r border-border flex flex-col">
                     <TranscriptPanel messages={transcript} />
                 </div>
 
-                {/* Right 40% — Copilot */}
-                <div className="w-[40%] flex flex-col overflow-auto">
+                {/* Center 35% — SOAP Note */}
+                <div className="w-[35%] border-r border-border flex flex-col">
+                    <SOAPPanel data={soap} />
+                </div>
+
+                {/* Right 30% — Copilot */}
+                <div className="w-[30%] flex flex-col overflow-auto bg-surface/30">
                     <CopilotPanel
                         alerts={alerts}
                         suggestedQuestions={suggestedQuestions}
                         onAlertClick={(alert) => setSelectedAlert(alert)}
                     />
-                    <div className="mt-4 border-t border-border pt-4 px-4 pb-20">
+                    <div className="mt-auto border-t border-border pt-4 px-4 pb-20">
                         <PatientSummaryPanel summary={summary} />
                     </div>
                 </div>

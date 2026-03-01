@@ -1,0 +1,103 @@
+{
+  "patient": {
+    "id": "PT-2024-0892",
+    "name": "Priya Sharma",
+    "age": 34,
+    "gender": "Female",
+    "bloodGroup": "O+",
+    "conditions": [
+      "Asthma (moderate persistent)"
+    ],
+    "medications": [
+      "Budesonide-Formoterol 200/6 mcg BD",
+      "Montelukast 10mg OD"
+    ],
+    "allergies": [
+      "Aspirin",
+      "NSAIDs"
+    ],
+    "lastAbnormalLab": "Eosinophils — 8% (elevated)",
+    "visitReason": "Acute exacerbation – chest tightness"
+  },
+  "transcript": [
+    {
+      "speaker": "doctor",
+      "text": "Hey, Priya Sharma. This is your doctor, Sukhun speaking.",
+      "timestamp": "14:01"
+    },
+    {
+      "speaker": "patient",
+      "text": "Hello, doctor. I have fever.",
+      "timestamp": "14:02"
+    },
+    {
+      "speaker": "doctor",
+      "text": "How long have you been having this",
+      "timestamp": "14:02"
+    },
+    {
+      "speaker": "doctor",
+      "text": "fever for?",
+      "timestamp": "14:02"
+    },
+    {
+      "speaker": "patient",
+      "text": "Three days, doctor.",
+      "timestamp": "14:02"
+    },
+    {
+      "speaker": "patient",
+      "text": "I also have throat infection.",
+      "timestamp": "14:03"
+    },
+    {
+      "speaker": "patient",
+      "text": "I also have throat infection.",
+      "timestamp": "14:03"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Can you describe the severity of a torn infection?",
+      "timestamp": "14:03"
+    },
+    {
+      "speaker": "patient",
+      "text": "I cannot swallow food with ease.",
+      "timestamp": "14:04"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Okay. Let's decide.",
+      "timestamp": "14:04"
+    }
+  ],
+  "report": {
+    "soap": {
+      "subjective": [
+        "The patient, Priya Sharma, reports having a fever for three days.",
+        "The patient also complains of a throat infection, which is causing difficulty in swallowing food."
+      ],
+      "objective": [
+        "The patient's symptoms include fever and throat infection."
+      ],
+      "assessment": [
+        "The patient's symptoms are consistent with a respiratory infection, which may be exacerbating her moderate persistent asthma."
+      ],
+      "plan": [
+        "The patient should continue her current medications, Budesonide-Formoterol 200/6 mcg BD and Montelukast 10mg OD.",
+        "Additional treatment for the throat infection and fever may be necessary, such as antibiotics or antipyretics, but caution should be exercised due to the patient's allergy to Aspirin and NSAIDs."
+      ]
+    },
+    "aiSummary": {
+      "narrative": "The patient, Priya Sharma, presents with a fever and throat infection, which may be exacerbating her moderate persistent asthma. She should continue her current medications and may require additional treatment for the throat infection and fever.",
+      "medications": [
+        "Budesonide-Formoterol 200/6 mcg BD (continue)",
+        "Montelukast 10mg OD (continue)"
+      ],
+      "warnings": [
+        "The patient has a known allergy to Aspirin and NSAIDs, which should be avoided in any additional treatment.",
+        "Potential drug interactions should be monitored, particularly with the introduction of new medications."
+      ]
+    }
+  }
+}

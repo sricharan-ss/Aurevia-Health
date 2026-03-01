@@ -78,12 +78,18 @@ export default function SOAPPanel({ data }: SOAPPanelProps) {
                                 </h3>
                             </div>
                             <ul className="space-y-1.5 pl-1">
-                                {section.data.map((item: string, i: number) => (
-                                    <li key={i} className="text-xs text-foreground leading-relaxed flex items-start gap-2">
-                                        <span className="w-1 h-1 rounded-full bg-muted-light mt-1.5 shrink-0"></span>
-                                        {item}
+                                {section.data && section.data.length > 0 ? (
+                                    section.data.map((item: string, i: number) => (
+                                        <li key={i} className="text-xs text-foreground leading-relaxed flex items-start gap-2">
+                                            <span className="w-1 h-1 rounded-full bg-muted-light mt-1.5 shrink-0"></span>
+                                            {item}
+                                        </li>
+                                    ))
+                                ) : (
+                                    <li className="text-[11px] text-muted-light italic pl-3 pb-1">
+                                        No {section.label} notes available yet...
                                     </li>
-                                ))}
+                                )}
                             </ul>
                         </div>
                     );

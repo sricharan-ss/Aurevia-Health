@@ -1,0 +1,111 @@
+{
+  "patient": {
+    "id": "PT-2024-0892",
+    "name": "Priya Sharma",
+    "age": 34,
+    "gender": "Female",
+    "bloodGroup": "O+",
+    "conditions": [
+      "Asthma (moderate persistent)"
+    ],
+    "medications": [
+      "Budesonide-Formoterol 200/6 mcg BD",
+      "Montelukast 10mg OD"
+    ],
+    "allergies": [
+      "Aspirin",
+      "NSAIDs"
+    ],
+    "lastAbnormalLab": "Eosinophils — 8% (elevated)",
+    "visitReason": "Acute exacerbation – chest tightness"
+  },
+  "transcript": [
+    {
+      "speaker": "doctor",
+      "text": "Hello, Priya. This is your doctor speaking.",
+      "timestamp": "14:58"
+    },
+    {
+      "speaker": "doctor",
+      "text": "What brings you to consultation today?",
+      "timestamp": "14:58"
+    },
+    {
+      "speaker": "patient",
+      "text": "My throat is paining difficult swallowing.",
+      "timestamp": "14:58"
+    },
+    {
+      "speaker": "doctor",
+      "text": "How long have you been experiencing this for?",
+      "timestamp": "14:58"
+    },
+    {
+      "speaker": "patient",
+      "text": "Two days.",
+      "timestamp": "14:59"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Can you describe the severity of your throat pain?",
+      "timestamp": "14:59"
+    },
+    {
+      "speaker": "patient",
+      "text": "Itchy feeling. Pain in the throat.",
+      "timestamp": "15:00"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Can you rate the severity of your throat pain?",
+      "timestamp": "15:00"
+    },
+    {
+      "speaker": "patient",
+      "text": "Unable to swallow properly.",
+      "timestamp": "15:00"
+    },
+    {
+      "speaker": "patient",
+      "text": "My throat is paining difficult swallowing.",
+      "timestamp": "15:00"
+    },
+    {
+      "speaker": "doctor",
+      "text": "You have any other symptoms?",
+      "timestamp": "15:00"
+    }
+  ],
+  "report": {
+    "soap": {
+      "subjective": [
+        "Patient reports difficulty swallowing and itchy feeling in the throat",
+        "Patient has been experiencing throat pain for 2 days",
+        "Patient reports being unable to swallow properly"
+      ],
+      "objective": [
+        "No objective findings were discussed in this consultation"
+      ],
+      "assessment": [
+        "Acute pharyngitis or tonsillitis is a possible cause of the patient's symptoms"
+      ],
+      "plan": [
+        "Further evaluation is needed to determine the cause of the throat pain",
+        "Consider ordering a throat swab or other diagnostic tests",
+        "Recommend over-the-counter pain relievers that are safe for the patient to take, considering their aspirin and NSAID allergy",
+        "Schedule a follow-up appointment to monitor the patient's symptoms and adjust the plan as needed"
+      ]
+    },
+    "aiSummary": {
+      "narrative": "The patient presents with a 2-day history of throat pain and difficulty swallowing, with an itchy feeling in the throat. The patient has a history of asthma and allergies to aspirin and NSAIDs. A possible cause of the symptoms is acute pharyngitis or tonsillitis. The plan includes further evaluation and consideration of ordering diagnostic tests, as well as recommending safe pain relievers and scheduling a follow-up appointment.",
+      "medications": [
+        "Continue Budesonide-Formoterol 200/6 mcg BD",
+        "Continue Montelukast 10mg OD",
+        "Consider prescribing a safe pain reliever for the patient's throat pain"
+      ],
+      "warnings": [
+        "The patient has a history of allergies to aspirin and NSAIDs, which should be considered when prescribing pain relievers"
+      ]
+    }
+  }
+}

@@ -6,7 +6,8 @@ import { transcribeAudio } from '../ai-engine/transcription';
 import { deepgramService } from '../ai-engine/deepgramLive';
 import fs from 'fs';
 
-import { geminiEngine } from '../ai-engine/geminiEngine';
+import { groqEngine } from '../ai-engine/groqEngine';
+import path from 'path';
 
 // In-memory state tracking per patient
 const activeConsultations: Record<string, ConsultationState> = {};
@@ -52,9 +53,14 @@ export const processConsultationChunk = async (req: Request, res: Response) => {
     }
 
     try {
-        // Run Gemini Intelligence - INCREMENTAL/DELTA MODE
+        const patient = (patientsData as Patient[]).find(p => p.id === patientId);
+        if (!patient) {
+            return res.status(404).json({ error: 'Patient not found' });
+        }
+
+        // Run Groq Intelligence - INCREMENTAL/DELTA MODE
         // We only pass the NEW chunks to the engine, plus the LAST cumulative summary
-        const insights = await geminiEngine.processLiveChunk(chunks, state.lastAIPushSummary);
+        const insights = await groqEngine.processLiveChunk(chunks, patient, state.lastAIPushSummary);
 
         const response: ConsultationResponse = {
             soap: insights.soap || { subjective: [], objective: [], assessment: [], plan: [] },
@@ -109,6 +115,66 @@ export const liveTranscribe = async (req: Request, res: Response) => {
     }
 };
 
+export const getRecentConsultations = async (req: Request, res: Response) => {
+    try {
+        const reportDir = './src/data/consultations';
+        const absolutePath = path.resolve(reportDir);
+        console.log(`[Recent] Scanning directory: ${absolutePath}`);
+
+        if (!fs.existsSync(reportDir)) {
+            console.log(`[Recent] Directory does not exist: ${absolutePath}`);
+            return res.json([]);
+        }
+
+        const files = fs.readdirSync(reportDir);
+        console.log(`[Recent] Found ${files.length} files:`, files);
+
+        const consultations = files
+            .filter(f => f.endsWith('.json'))
+            .map(f => {
+                try {
+                    const filePath = `${reportDir}/${f}`;
+                    const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+                    const stats = fs.statSync(filePath);
+                    return {
+                        id: f.replace('.json', ''),
+                        patientId: content.patient?.id,
+                        patientName: content.patient?.name,
+                        date: stats.mtime,
+                        summary: content.report?.aiSummary?.narrative?.substring(0, 100) + "..."
+                    };
+                } catch (parseErr) {
+                    console.error(`[Recent] Error parsing ${f}:`, parseErr);
+                    return null;
+                }
+            })
+            .filter(c => c !== null)
+            .sort((a, b) => (b as any).date.getTime() - (a as any).date.getTime());
+
+        res.json(consultations);
+    } catch (err) {
+        console.error("[Recent] Failed to fetch consultations:", err);
+        res.status(500).json({ error: "Failed to fetch consultations" });
+    }
+};
+
+export const getConsultationReport = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const filePath = `./src/data/consultations/${id}.json`;
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: "Report not found" });
+        }
+
+        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        res.json(content);
+    } catch (err) {
+        console.error("[Report] Failed to fetch report:", err);
+        res.status(500).json({ error: "Failed to fetch report" });
+    }
+};
+
 export const endConsultation = async (req: Request, res: Response) => {
     const { patientId } = req.body;
     if (!patientId || !activeConsultations[patientId]) {
@@ -118,7 +184,28 @@ export const endConsultation = async (req: Request, res: Response) => {
     const state = activeConsultations[patientId];
 
     try {
-        const report = await geminiEngine.generateFinalReport(state.transcript);
+        const patient = (patientsData as Patient[]).find(p => p.id === patientId);
+        if (!patient) {
+            return res.status(404).json({ error: 'Patient not found' });
+        }
+
+        const report = await groqEngine.generateFinalReport(state.transcript, patient);
+
+        // Final persistence for audit/review
+        try {
+            const reportDir = './src/data/consultations';
+            if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
+
+            const filename = `${patientId}_${Date.now()}.json`;
+            fs.writeFileSync(`${reportDir}/${filename}`, JSON.stringify({
+                patient,
+                transcript: state.transcript,
+                report
+            }, null, 2));
+            console.log(`[Controller] Saved final report: ${filename}`);
+        } catch (saveErr) {
+            console.error("Failed to persist report:", saveErr);
+        }
 
         // Final cleanup
         delete activeConsultations[patientId];

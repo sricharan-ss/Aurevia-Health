@@ -13,7 +13,7 @@ type NavItem = {
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchPaths: ["/dashboard"] },
     { href: "/patients", label: "Patients", icon: Users, matchPaths: ["/patients"] },
-    { href: "/consultation/live", label: "Consultation", icon: Stethoscope, matchPaths: ["/consultation"] },
+    { href: "/consultation", label: "Consultation", icon: Stethoscope, matchPaths: ["/consultation"] },
 ];
 
 export default function Sidebar() {

@@ -5,12 +5,16 @@ import {
     processConsultationChunk,
     transcribeAudioUpload,
     liveTranscribe,
-    endConsultation
+    endConsultation,
+    getRecentConsultations,
+    getConsultationReport
 } from '../controllers/consultationController';
 
 const router = Router();
 const upload = multer({ dest: 'uploads/' });
 
+router.get('/recent', getRecentConsultations);
+router.get('/report/:id', getConsultationReport);
 router.post('/start', startConsultation);
 router.post('/process', processConsultationChunk);
 router.post('/transcribe', upload.single('audio'), transcribeAudioUpload);

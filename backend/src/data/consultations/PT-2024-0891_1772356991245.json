@@ -1,0 +1,129 @@
+{
+  "patient": {
+    "id": "PT-2024-0891",
+    "name": "Rajesh Kumar",
+    "age": 58,
+    "gender": "Male",
+    "bloodGroup": "B+",
+    "conditions": [
+      "Type 2 Diabetes Mellitus",
+      "Hypertension Stage II"
+    ],
+    "medications": [
+      "Metformin 500mg BD",
+      "Amlodipine 5mg OD",
+      "Atorvastatin 20mg HS"
+    ],
+    "allergies": [
+      "Sulfonamides"
+    ],
+    "lastAbnormalLab": "HbA1c — 8.2% (elevated)",
+    "visitReason": "Follow-up – uncontrolled blood sugar"
+  },
+  "transcript": [
+    {
+      "speaker": "doctor",
+      "text": "Hello, Rajesh. This is your doctor speaking.",
+      "timestamp": "14:49"
+    },
+    {
+      "speaker": "doctor",
+      "text": "What is your purpose of visit?",
+      "timestamp": "14:50"
+    },
+    {
+      "speaker": "patient",
+      "text": "My throat is",
+      "timestamp": "14:50"
+    },
+    {
+      "speaker": "patient",
+      "text": "peening difficult swallowing.",
+      "timestamp": "14:50"
+    },
+    {
+      "speaker": "doctor",
+      "text": "How long have you been having these symptoms for?",
+      "timestamp": "14:50"
+    },
+    {
+      "speaker": "patient",
+      "text": "Two days.",
+      "timestamp": "14:50"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Can you please describe your throat symptoms in more detail?",
+      "timestamp": "14:50"
+    },
+    {
+      "speaker": "patient",
+      "text": "Itchy feeling.",
+      "timestamp": "14:51"
+    },
+    {
+      "speaker": "patient",
+      "text": "Pain in the throat.",
+      "timestamp": "14:51"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Do you have any other symptoms?",
+      "timestamp": "14:51"
+    },
+    {
+      "speaker": "patient",
+      "text": "Unable to swallow properly,",
+      "timestamp": "14:51"
+    },
+    {
+      "speaker": "patient",
+      "text": "like something is stuck,",
+      "timestamp": "14:51"
+    },
+    {
+      "speaker": "doctor",
+      "text": "Do you have fever?",
+      "timestamp": "14:52"
+    },
+    {
+      "speaker": "patient",
+      "text": "Body pain, feeling feverish.",
+      "timestamp": "14:52"
+    }
+  ],
+  "report": {
+    "soap": {
+      "subjective": [
+        "Patient complains of difficulty swallowing",
+        "Itchy feeling in the throat",
+        "Pain in the throat",
+        "Unable to swallow properly",
+        "Feels like something is stuck",
+        "Body pain, feeling feverish"
+      ],
+      "objective": [
+        "Symptoms duration: 2 days"
+      ],
+      "assessment": [
+        "Acute pharyngitis"
+      ],
+      "plan": [
+        "Further evaluation for cause of pharyngitis",
+        "Consider analgesics and antipyretics for symptom management"
+      ]
+    },
+    "aiSummary": {
+      "narrative": "The patient, with a history of Type 2 Diabetes Mellitus and Hypertension Stage II, presents with a 2-day history of difficulty swallowing, itchy throat, pain, and feeling feverish. The patient's current medications include Metformin, Amlodipine, and Atorvastatin. Given the symptoms, acute pharyngitis is a possible diagnosis. The patient's allergy to Sulfonamides should be considered when selecting medications.",
+      "medications": [
+        "Continue Metformin 500mg BD",
+        "Continue Amlodipine 5mg OD",
+        "Continue Atorvastatin 20mg HS"
+      ],
+      "warnings": [
+        "Allergy to Sulfonamides",
+        "Monitor for potential interactions with new medications"
+      ]
+    }
+  }
+}

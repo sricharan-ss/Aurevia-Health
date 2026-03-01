@@ -1,0 +1,65 @@
+{
+  "patient": {
+    "id": "PT-2024-0891",
+    "name": "Rajesh Kumar",
+    "age": 58,
+    "gender": "Male",
+    "bloodGroup": "B+",
+    "conditions": [
+      "Type 2 Diabetes Mellitus",
+      "Hypertension Stage II"
+    ],
+    "medications": [
+      "Metformin 500mg BD",
+      "Amlodipine 5mg OD",
+      "Atorvastatin 20mg HS"
+    ],
+    "allergies": [
+      "Sulfonamides"
+    ],
+    "lastAbnormalLab": "HbA1c — 8.2% (elevated)",
+    "visitReason": "Follow-up – uncontrolled blood sugar"
+  },
+  "transcript": [
+    {
+      "speaker": "patient",
+      "text": "hey ",
+      "timestamp": "15:05"
+    },
+    {
+      "speaker": "doctor",
+      "text": "hey rajesh how are you ",
+      "timestamp": "15:06"
+    }
+  ],
+  "report": {
+    "soap": {
+      "subjective": [
+        "Patient greeted the doctor"
+      ],
+      "objective": [
+        "No new symptoms or complaints discussed",
+        "Current medications: Metformin 500mg BD, Amlodipine 5mg OD, Atorvastatin 20mg HS",
+        "Allergies: Sulfonamides"
+      ],
+      "assessment": [
+        "No new clinical findings discussed during this consultation"
+      ],
+      "plan": [
+        "Continue current medications: Metformin 500mg BD, Amlodipine 5mg OD, Atorvastatin 20mg HS",
+        "Schedule follow-up consultation to monitor existing conditions"
+      ]
+    },
+    "aiSummary": {
+      "narrative": "The patient had a brief conversation with the doctor, but no new symptoms or complaints were discussed. The patient's current medications and allergies were noted, but no changes to the treatment plan were made.",
+      "medications": [
+        "Metformin 500mg BD (Continue)",
+        "Amlodipine 5mg OD (Continue)",
+        "Atorvastatin 20mg HS (Continue)"
+      ],
+      "warnings": [
+        "No new warnings based on this conversation, but be aware of potential interactions between current medications and sulfonamide allergies"
+      ]
+    }
+  }
+}
