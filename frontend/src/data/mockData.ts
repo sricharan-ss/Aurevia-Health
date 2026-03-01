@@ -1,16 +1,4 @@
-export interface Patient {
-    id: string;
-    name: string;
-    age: number;
-    gender: string;
-    bloodGroup: string;
-    conditions: string[];
-    medications: string[];
-    allergies: string[];
-    lastAbnormalLab: string;
-    visitReason: string;
-    status: "waiting" | "in-progress" | "completed";
-}
+import { Patient, TranscriptMessage, AlertData, SOAPData } from "@/types/clinical";
 
 export const patients: Patient[] = [
     {
@@ -93,11 +81,7 @@ export const patients: Patient[] = [
     },
 ];
 
-export interface TranscriptMessage {
-    role: "doctor" | "patient";
-    text: string;
-    timestamp: string;
-}
+
 
 export const transcriptMessages: TranscriptMessage[] = [
     { role: "doctor", text: "Good morning, Rajesh. How have you been feeling since our last visit?", timestamp: "09:32" },
@@ -115,16 +99,7 @@ export const transcriptMessages: TranscriptMessage[] = [
     { role: "doctor", text: "Let's also recheck your renal function and lipid panel in 4 weeks. And please try to return to your diet plan.", timestamp: "09:38" },
 ];
 
-export interface AlertData {
-    id: string;
-    type: "drug-interaction" | "allergy" | "lab-critical";
-    title: string;
-    severity: "high" | "medium" | "low";
-    sourceSentence: string;
-    medicationsInvolved: string[];
-    reasoning: string;
-    timestamp: string;
-}
+
 
 export const alertsData: AlertData[] = [
     {
@@ -133,20 +108,16 @@ export const alertsData: AlertData[] = [
         title: "Drug Interaction Detected",
         severity: "high",
         sourceSentence: "\"I'm thinking about Glimepiride, a sulfonylurea.\"",
-        medicationsInvolved: ["Glimepiride (proposed)", "Metformin 500mg BD (current)"],
+        medications: ["Glimepiride (proposed)", "Metformin 500mg BD (current)"],
         reasoning: "Adding Glimepiride to existing Metformin therapy increases the risk of hypoglycemia, especially in patients with inconsistent dietary patterns. The patient has reported dietary inconsistency. Close monitoring of blood glucose levels is recommended. Consider starting at a low dose (1mg) and titrating gradually.",
+        confidence: "High",
         timestamp: "09:36",
     },
 ];
 
-export interface SOAPNote {
-    subjective: string[];
-    objective: string[];
-    assessment: string[];
-    plan: string[];
-}
 
-export const soapNote: SOAPNote = {
+
+export const soapNote: SOAPData = {
     subjective: [
         "Patient reports increased fatigue over the past 3 weeks",
         "Fasting blood sugar readings consistently between 180–200 mg/dL at home",

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
-import { patients, type Patient } from "@/data/mockData";
+import { patients } from "@/data/mockData";
+import type { Patient } from "@/types/clinical";
 
 type StatusFilter = "all" | "waiting" | "in-progress" | "completed";
 

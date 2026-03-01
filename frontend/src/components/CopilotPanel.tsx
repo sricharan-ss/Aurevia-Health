@@ -3,17 +3,7 @@
 import { MessageCircleQuestion, ShieldCheck, ShieldAlert } from "lucide-react";
 import AlertCard from "./AlertCard";
 
-export interface AlertData {
-    id: string;
-    type: string;
-    severity: "low" | "medium" | "high";
-    title: string;
-    medications: string[];
-    sourceSentence: string;
-    reasoning: string;
-    confidence: "High" | "Medium" | "Low";
-    timestamp: string;
-}
+import type { AlertData } from "@/types/clinical";
 
 interface CopilotPanelProps {
     alerts: AlertData[];

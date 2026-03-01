@@ -1,7 +1,7 @@
 "use client";
 
 import { User, Droplet, Heart, Pill, AlertTriangle, FlaskConical, FileText } from "lucide-react";
-import type { Patient } from "@/data/mockData";
+import type { Patient } from "@/types/clinical";
 
 interface PatientSnapshotProps {
     patient: Patient;

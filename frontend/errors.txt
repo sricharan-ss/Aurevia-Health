@@ -1,0 +1,10 @@
+﻿src/components/LiveConsultationLayout.tsx(6,25): error TS2724: '"@/data/mockData"' has no exported member named 'Patient'. Did you mean 'patients'?
+src/components/LiveConsultationLayout.tsx(8,29): error TS2614: Module '"./CopilotPanel"' has no exported member 'AlertData'. Did you mean to use 'import AlertData from "./CopilotPanel"' instead?
+src/components/PatientSnapshot.tsx(4,15): error TS2724: '"@/data/mockData"' has no exported member named 'Patient'. Did you mean 'patients'?
+src/components/PatientSnapshot.tsx(43,54): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/components/PatientSnapshot.tsx(43,57): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/components/PatientSnapshot.tsx(53,55): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/components/PatientSnapshot.tsx(53,58): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/components/PatientSnapshot.tsx(68,57): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/components/PatientSnapshot.tsx(68,60): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/components/PatientsTable.tsx(6,25): error TS2724: '"@/data/mockData"' has no exported member named 'Patient'. Did you mean 'patients'?

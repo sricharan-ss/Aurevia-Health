@@ -3,13 +3,10 @@
 import { useState, useEffect } from "react";
 import { ClipboardList, Stethoscope, Brain, ListChecks } from "lucide-react";
 
+import type { SOAPData } from "@/types/clinical";
+
 interface SOAPPanelProps {
-    data: {
-        subjective: string[];
-        objective: string[];
-        assessment: string[];
-        plan: string[];
-    } | null;
+    data: SOAPData | null;
 }
 
 export default function SOAPPanel({ data }: SOAPPanelProps) {

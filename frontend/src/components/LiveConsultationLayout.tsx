@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { User, Clock, Radio, Square, Send, Loader2 } from "lucide-react";
-import { patients, type Patient } from "@/data/mockData";
+import { patients } from "@/data/mockData";
+import type { Patient, AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
 import TranscriptPanel from "./TranscriptPanel";
-import CopilotPanel, { type AlertData } from "./CopilotPanel";
+import CopilotPanel from "./CopilotPanel";
 import ExplainabilityModal from "./ExplainabilityModal";
 import AudioRecorder from "./AudioRecorder";
 import SOAPPanel from "./SOAPPanel";
@@ -15,11 +16,7 @@ function getPatientById(id: string): Patient | undefined {
     return patients.find((p) => p.id === id);
 }
 
-interface TranscriptChunk {
-    role: "doctor" | "patient";
-    text: string;
-    timestamp: string;
-}
+
 
 export default function LiveConsultationLayout() {
     const searchParams = useSearchParams();
@@ -29,7 +26,7 @@ export default function LiveConsultationLayout() {
 
     const [elapsed, setElapsed] = useState(0);
     const [selectedAlert, setSelectedAlert] = useState<AlertData | null>(null);
-    const [transcript, setTranscript] = useState<any[]>([]);
+    const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
     const [alerts, setAlerts] = useState<AlertData[]>([]);
     const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
     const [soap, setSoap] = useState<any>(null);
@@ -119,8 +116,10 @@ export default function LiveConsultationLayout() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     patientId,
-                    speaker,
-                    text: messageText,
+                    chunks: [{
+                        speaker,
+                        text: messageText,
+                    }],
                 }),
             });
 
@@ -166,13 +165,13 @@ export default function LiveConsultationLayout() {
                     <div className="flex items-center bg-surface rounded-lg p-1 border border-border/50">
                         <button
                             onClick={() => setSpeaker("patient")}
-                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${speaker === "patient" ? "bg-card text-foreground shadow-sm" : "text-muted hover:text-foreground"}`}
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${speaker === "patient" ? "bg-card text-foreground shadow-sm" : "text-muted hover:text-foreground"}`}
                         >
                             PATIENT
                         </button>
                         <button
                             onClick={() => setSpeaker("doctor")}
-                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${speaker === "doctor" ? "bg-card text-primary shadow-sm" : "text-muted hover:text-foreground"}`}
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${speaker === "doctor" ? "bg-card text-primary shadow-sm" : "text-muted hover:text-foreground"}`}
                         >
                             DOCTOR
                         </button>
@@ -210,7 +209,7 @@ export default function LiveConsultationLayout() {
                 </div>
             </div>
 
-            {/* Main content — 60/40 split */}
+            {/* Main content — 2-pane split (Transcript & Copilot) */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left 60% — Transcript */}
                 <div className="w-[60%] border-r border-border flex flex-col">

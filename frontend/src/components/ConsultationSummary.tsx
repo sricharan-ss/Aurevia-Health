@@ -7,6 +7,7 @@ import {
     MessageSquare, ShieldAlert, ArrowLeft, Download
 } from "lucide-react";
 import { patients, soapNote, transcriptMessages, alertsData, patientSummary } from "@/data/mockData";
+import type { Patient, AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
 import Link from "next/link";
 
 export default function ConsultationSummary() {
@@ -175,7 +176,7 @@ export default function ConsultationSummary() {
                             </div>
                             <p className="text-xs text-foreground leading-relaxed mb-2">{alert.reasoning}</p>
                             <p className="text-[11px] text-muted-light">
-                                Medications: {(alert.medicationsInvolved || []).join(" ↔ ")}
+                                Medications: {(alert.medications || []).join(" ↔ ")}
                             </p>
                         </div>
                     ))}

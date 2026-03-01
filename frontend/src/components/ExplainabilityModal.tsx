@@ -1,7 +1,7 @@
 "use client";
 
 import { X, ShieldAlert, Pill, Brain, Quote, Gauge } from "lucide-react";
-import type { AlertData } from "./CopilotPanel";
+import type { AlertData } from "@/types/clinical";
 
 interface ExplainabilityModalProps {
     alert: AlertData;

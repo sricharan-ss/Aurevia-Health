@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import type { Patient } from "@/data/mockData";
+import type { Patient, TranscriptMessage, SOAPData, AlertData } from "@/types/clinical";
 import { alertsData } from "@/data/mockData";
 import PatientSnapshot from "./PatientSnapshot";
 import SOAPPanel from "./SOAPPanel";
@@ -16,7 +16,10 @@ interface ConsultationViewProps {
 }
 
 export default function ConsultationView({ patient }: ConsultationViewProps) {
-    const [selectedAlert, setSelectedAlert] = useState<typeof alertsData[0] | null>(null);
+    const [selectedAlert, setSelectedAlert] = useState<AlertData | null>(null);
+    const [messages, setMessages] = useState<TranscriptMessage[]>([]);
+    const [soapData, setSoapData] = useState<SOAPData | null>(null);
+    const [summary, setSummary] = useState<string>("");
 
     return (
         <div className="max-w-[1400px]">
@@ -26,10 +29,10 @@ export default function ConsultationView({ patient }: ConsultationViewProps) {
             {/* Three-panel consultation layout */}
             <div className="grid grid-cols-[1fr_1fr_280px] gap-4 h-[calc(100vh-280px)]">
                 {/* Left — SOAP Panel */}
-                <SOAPPanel />
+                <SOAPPanel data={soapData} />
 
                 {/* Center — Transcript */}
-                <TranscriptPanel />
+                <TranscriptPanel messages={messages} />
 
                 {/* Right — Alerts */}
                 <div className="bg-card border border-border rounded-xl shadow-sm h-full flex flex-col overflow-hidden">
@@ -64,7 +67,7 @@ export default function ConsultationView({ patient }: ConsultationViewProps) {
             </div>
 
             {/* Patient Summary */}
-            <PatientSummaryPanel />
+            <PatientSummaryPanel summary={summary} />
 
             {/* Explainability Modal */}
             {selectedAlert && (

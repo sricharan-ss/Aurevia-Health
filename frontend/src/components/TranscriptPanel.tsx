@@ -3,11 +3,7 @@
 import { useEffect, useRef } from "react";
 import { MessageSquare } from "lucide-react";
 
-interface TranscriptMessage {
-    role: "doctor" | "patient";
-    text: string;
-    timestamp: string;
-}
+import type { TranscriptMessage } from "@/types/clinical";
 
 interface TranscriptPanelProps {
     messages: TranscriptMessage[];

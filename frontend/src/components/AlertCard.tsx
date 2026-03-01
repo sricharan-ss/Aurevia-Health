@@ -2,17 +2,7 @@
 
 import { AlertTriangle, ShieldAlert, FlaskConical } from "lucide-react";
 
-export interface AlertData {
-    id: string;
-    type: string;
-    severity: "low" | "medium" | "high";
-    title: string;
-    medications: string[];
-    sourceSentence: string;
-    reasoning: string;
-    confidence: "High" | "Medium" | "Low";
-    timestamp: string;
-}
+import type { AlertData } from "@/types/clinical";
 
 interface AlertCardProps {
     alert: AlertData;
