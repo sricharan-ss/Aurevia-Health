@@ -1,0 +1,42 @@
+{
+  "patient": {
+    "id": "PT-2024-0892",
+    "name": "Priya Sharma",
+    "age": 34,
+    "gender": "Female",
+    "bloodGroup": "O+",
+    "conditions": [
+      "Asthma (moderate persistent)"
+    ],
+    "medications": [
+      "Budesonide-Formoterol 200/6 mcg BD",
+      "Montelukast 10mg OD"
+    ],
+    "allergies": [
+      "Aspirin",
+      "NSAIDs"
+    ],
+    "lastAbnormalLab": "Eosinophils — 8% (elevated)",
+    "visitReason": "Acute exacerbation – chest tightness"
+  },
+  "transcript": [],
+  "report": {
+    "soap": {
+      "subjective": [],
+      "objective": [],
+      "assessment": [],
+      "plan": []
+    },
+    "aiSummary": {
+      "narrative": "The patient has a history of moderate persistent asthma and is currently taking Budesonide-Formoterol 200/6 mcg BD and Montelukast 10mg OD. The patient is also allergic to Aspirin and NSAIDs. However, there is no transcript provided to analyze and generate a structured SOAP note and AI narrative.",
+      "medications": [
+        "Budesonide-Formoterol 200/6 mcg BD",
+        "Montelukast 10mg OD"
+      ],
+      "warnings": [
+        "Aspirin allergy",
+        "NSAIDs allergy"
+      ]
+    }
+  }
+}
