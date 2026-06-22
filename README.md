@@ -1,4 +1,4 @@
-#🩺 Aurevia Health
+# Aurevia Health
 AI-Powered Clinical Intelligence Platform
 
 Aurevia Health is an ambient clinical AI assistant designed to reduce documentation burden for healthcare professionals. It listens to doctor-patient conversations in real time, extracts medically relevant information, generates structured clinical documentation, identifies potential safety concerns, and produces patient-friendly summaries—all within a seamless consultation workflow.
