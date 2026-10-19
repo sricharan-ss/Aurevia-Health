@@ -1,136 +1,100 @@
 import WebSocket from 'ws';
 import { appConfig, type AppConfig } from '../config';
+import type { AppDatabase } from '../db';
+import { appendTranscriptSegment } from '../db/consultations';
+
+export type UpstreamFactory = (url: string, options: WebSocket.ClientOptions) => WebSocket;
+interface Session { upstream: WebSocket; closed: Promise<void>; closeStream: () => void; }
+
+export class LiveSessionManager {
+    private readonly sessions = new Map<string, Session>();
+
+    get(id: string): Session | undefined { return this.sessions.get(id); }
+    set(id: string, session: Session): void { this.sessions.set(id, session); }
+    remove(id: string, session: Session): void { if (this.sessions.get(id) === session) this.sessions.delete(id); }
+
+    async closeAndWait(id: string, timeoutMs = 5000): Promise<boolean> {
+        const session = this.sessions.get(id);
+        if (!session) return true;
+        session.closeStream();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timedOut = await Promise.race([
+            session.closed.then(() => false),
+            new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(true), timeoutMs); })
+        ]);
+        if (timer) clearTimeout(timer);
+        if (timedOut) session.upstream.terminate();
+        return !timedOut;
+    }
+}
 
 export class DeepgramService {
-    constructor(private readonly config: AppConfig = appConfig) {}
+    constructor(private readonly config: AppConfig = appConfig, private readonly upstreamFactory: UpstreamFactory = (url, options) => new WebSocket(url, options)) {}
 
-    /**
-     * Handles a live WebSocket stream from the frontend
-     * Proxies it to Deepgram and manages speaker mapping
-     */
-    public handleLiveStream(clientWs: WebSocket) {
-        console.log("[Deepgram] Received client connection request");
+    async handleLiveStream(clientWs: WebSocket, consultationId: string, db: AppDatabase, sessions: LiveSessionManager): Promise<void> {
+        console.log('[Deepgram] Received client connection request');
+        await sessions.closeAndWait(consultationId, 5000);
         const apiKey = this.config.deepgramApiKey;
-        const isRealKey = apiKey && apiKey !== 'YOUR_KEY_HERE';
-
-        if (!isRealKey) {
-            // Send a mock message initially
-            clientWs.send(JSON.stringify({
-                type: 'transcript',
-                chunk: { speaker: 'doctor', text: '[MOCK MODE] Please provide a valid Deepgram key for live STT.' }
-            }));
+        if (!apiKey || apiKey === 'YOUR_KEY_HERE') {
+            clientWs.send(JSON.stringify({ type: 'transcript', chunk: { speaker: 'doctor', text: '[MOCK MODE] Please provide a valid Deepgram key for live STT.' } }));
             return;
         }
 
-        // Added endpointing, utterance_end_ms, and interim_results to give context parsing time.
-        const deepgramUrl = 'wss://api.deepgram.com/v1/listen?model=nova-2&diarize=true&punctuate=true&smart_format=true&interim_results=false&endpointing=300';
-        const deepgramWs = new WebSocket(deepgramUrl, {
-            headers: {
-                Authorization: `Token ${apiKey}`
+        const url = 'wss://api.deepgram.com/v1/listen?model=nova-2&diarize=true&punctuate=true&smart_format=true&interim_results=false&endpointing=300';
+        const upstream = this.upstreamFactory(url, { headers: { Authorization: `Token ${apiKey}` } });
+        let resolveClosed!: () => void;
+        const closed = new Promise<void>(resolve => { resolveClosed = resolve; });
+        const session: Session = {
+            upstream, closed,
+            closeStream: () => {
+                if (upstream.readyState === WebSocket.OPEN) upstream.send(JSON.stringify({ type: 'CloseStream' }));
             }
-        });
-
-        // Speaker mapping state
-        let speakerMap: Record<number, "doctor" | "patient"> = {};
+        };
+        sessions.set(consultationId, session);
+        let speakerMap: Record<number, 'doctor' | 'patient'> = {};
         let firstSpeakerDetected = false;
-        let audioBuffer: Buffer[] = [];
+        const audioBuffer: Buffer[] = [];
 
-        deepgramWs.on('open', () => {
-            console.log('[Deepgram] Connected to Deepgram Live API');
-            // Flush buffered audio
-            if (audioBuffer.length > 0) {
-                console.log(`[Deepgram] Flushing ${audioBuffer.length} buffered chunks`);
-                while (audioBuffer.length > 0) {
-                    const chunk = audioBuffer.shift();
-                    if (chunk) deepgramWs.send(chunk);
-                }
-            }
+        upstream.on('open', () => {
+            console.log('[Deepgram] Connected to live transcription provider');
+            while (audioBuffer.length && upstream.readyState === WebSocket.OPEN) upstream.send(audioBuffer.shift()!);
         });
-
-        deepgramWs.on('message', (data) => {
+        upstream.on('message', message => {
             try {
-                const response = JSON.parse(data.toString());
-
-                // Only process final (non-interim) endpointed utterances
-                if (response.is_final && response.channel && response.channel.alternatives[0].transcript) {
-                    const transcript = response.channel.alternatives[0].transcript;
-                    const words = response.channel.alternatives[0].words || [];
-
-                    if (words.length > 0 && transcript.trim().length > 0) {
-                        // Diarization logic: The first person to speak is the Doctor (Speaker 0 mapping)
-                        const rawSpeakerId = words[0].speaker || 0;
-
-                        if (!firstSpeakerDetected) {
-                            speakerMap[rawSpeakerId] = "doctor";
-                            firstSpeakerDetected = true;
-                            console.log(`[Deepgram Diarization] Assigned Speaker ${rawSpeakerId} as DOCTOR`);
-                        } else if (!(rawSpeakerId in speakerMap)) {
-                            speakerMap[rawSpeakerId] = "patient";
-                            console.log(`[Deepgram Diarization] Assigned Speaker ${rawSpeakerId} as PATIENT`);
-                        }
-
-                        const mappedRole = speakerMap[rawSpeakerId] || "patient";
-
-                        clientWs.send(JSON.stringify({
-                            type: 'transcript',
-                            chunk: {
-                                speaker: mappedRole,
-                                text: transcript
-                            }
-                        }));
-                    }
-                }
-            } catch {
-                console.error('[Deepgram] Failed to parse upstream message.');
-            }
+                const response = JSON.parse(message.toString()) as { is_final?: boolean; channel?: { alternatives?: Array<{ transcript?: string; words?: Array<{ speaker?: number }> }> } };
+                const alternative = response.channel?.alternatives?.[0];
+                const transcript = alternative?.transcript;
+                const words = alternative?.words ?? [];
+                if (!response.is_final || !transcript?.trim() || words.length === 0) return;
+                const speakerId = words[0].speaker ?? 0;
+                if (!firstSpeakerDetected) { speakerMap[speakerId] = 'doctor'; firstSpeakerDetected = true; }
+                else if (!(speakerId in speakerMap)) speakerMap[speakerId] = 'patient';
+                const speaker = speakerMap[speakerId] ?? 'patient';
+                const seq = appendTranscriptSegment(db, consultationId, speaker, transcript, 'speech');
+                if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'transcript', chunk: { speaker, text: transcript }, seq }));
+            } catch { console.error('[Deepgram] Failed to parse upstream message.'); }
         });
-
-        deepgramWs.on('error', () => {
+        upstream.on('error', () => {
             console.error('Deepgram WebSocket connection failed.');
-            if (clientWs.readyState === WebSocket.OPEN) {
-                clientWs.send(JSON.stringify({ type: 'error', message: 'Deepgram connection failed' }));
-            }
+            if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'error', message: 'Deepgram connection failed' }));
         });
-
-        deepgramWs.on('close', (code, reason) => {
+        upstream.on('close', code => {
             console.log(`[Deepgram] Connection closed. Code: ${code}`);
-            clientWs.close();
+            sessions.remove(consultationId, session);
+            resolveClosed();
+            if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
         });
-
-        // Backend proxy: Frontend -> Backend -> Deepgram
-        clientWs.on('message', (message) => {
-            if (Buffer.isBuffer(message)) {
-                if (deepgramWs.readyState === WebSocket.OPEN) {
-                    deepgramWs.send(message);
-                } else if (deepgramWs.readyState === WebSocket.CONNECTING) {
-                    // Buffer audio until deepgram is ready
-                    audioBuffer.push(message);
-                    if (audioBuffer.length % 10 === 0) {
-                        console.log(`[Deepgram] Buffering audio... (${audioBuffer.length} chunks)`);
-                    }
-                } else {
-                    console.warn(`[Deepgram] Received audio but Deepgram WS state is ${deepgramWs.readyState}`);
-                }
-            } else {
-                console.log('[Deepgram] Ignored non-binary client message.');
+        clientWs.on('message', data => {
+            if (Buffer.isBuffer(data)) {
+                if (upstream.readyState === WebSocket.OPEN) upstream.send(data);
+                else if (upstream.readyState === WebSocket.CONNECTING) audioBuffer.push(data);
             }
         });
-
-        clientWs.on('close', () => {
-            console.log("Client WebSocket closed");
-            if (deepgramWs.readyState === WebSocket.OPEN) {
-                deepgramWs.send(JSON.stringify({ type: 'CloseStream' }));
-                deepgramWs.close();
-            }
-            audioBuffer = [];
-        });
+        clientWs.on('close', () => { session.closeStream(); audioBuffer.length = 0; });
     }
-
 }
 
 export const deepgramService = new DeepgramService();
-
-// Exported wrapper for the WebSocket server
 export const handleLiveStream = (ws: WebSocket) => {
-    deepgramService.handleLiveStream(ws);
+    ws.close(1011, 'Consultation session is required.');
 };

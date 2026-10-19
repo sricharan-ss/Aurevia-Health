@@ -1,52 +1,32 @@
 import { Request, Response } from 'express';
 import type { AppDatabase } from '../db';
+import { appendTranscriptSegments, completeConsultation, getConsultation, isValidConsultationId, readTranscript, recoverConsultations, startConsultation, transitionConsultation, type ConsultationStatus } from '../db/consultations';
 import { getPatient } from '../db/patients';
-import { groqEngine } from '../ai-engine/groqEngine';
-import { ConsultationResponse, ConsultationState, Patient } from '../types';
+import { groqEngine, type EngineResult, type FinalReportData } from '../ai-engine/groqEngine';
+import { LiveSessionManager } from '../ai-engine/deepgramLive';
+import type { ConsultationResponse, Patient, TranscriptChunk } from '../types';
 import { sendApiError } from '../http/errors';
-import path from 'node:path';
 
-const activeConsultations: Record<string, ConsultationState & { startedAt: string }> = {};
-
-export function resolveReportPath(directory: string, id: string): string | null {
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) return null;
-    const basePath = path.resolve(directory);
-    const reportPath = path.resolve(basePath, `${id}.json`);
-    const relativePath = path.relative(basePath, reportPath);
-    if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) return null;
-    return reportPath;
+export interface ConsultationEngine {
+    processLiveChunk(chunks: TranscriptChunk[], patient: Patient, previous?: ConsultationResponse): Promise<EngineResult<Partial<ConsultationResponse>>>;
+    generateFinalReport(transcript: TranscriptChunk[], patient: Patient): Promise<EngineResult<FinalReportData>>;
 }
 
-function reportSummary(report: Record<string, unknown>): string {
-    const aiSummary = report.aiSummary;
-    if (!aiSummary || typeof aiSummary !== 'object') return '';
-    const narrative = (aiSummary as Record<string, unknown>).narrative;
-    return typeof narrative === 'string' ? `${narrative.substring(0, 100)}...` : '';
-}
+interface CachedInsights { lastProcessedSeq: number; data?: ConsultationResponse; }
+const emptyInsights = (): ConsultationResponse => ({ soap: { subjective: [], objective: [], assessment: [], plan: [] }, alerts: [], patientSummary: '', suggestedQuestions: [] });
 
-export function createConsultationController(db: AppDatabase) {
-    const getAll = (_req: Request, res: Response) => {
-        try {
-            const rows = db.prepare(`SELECT c.id,c.patient_id,c.ended_at,c.report_json,p.name
-                FROM consultations c JOIN patients p ON p.id=c.patient_id WHERE c.status='completed' ORDER BY c.ended_at DESC`).all() as Array<{ id: string; patient_id: string; ended_at: string; report_json: string | null; name: string }>;
-            return res.json(rows.map(row => {
-                const report = JSON.parse(row.report_json ?? '{}') as Record<string, unknown>;
-                return { id: row.id, patientId: row.patient_id, patientName: row.name, date: row.ended_at, summary: reportSummary(report) };
-            }));
-        } catch {
-            return sendApiError(res, 500, 'INTERNAL', 'Failed to fetch consultations.');
-        }
-    };
-
-    const getReport = (req: Request, res: Response) => {
-        const id = req.params.id;
-        if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) return sendApiError(res, 400, 'BAD_REQUEST', 'Invalid report ID.');
-        try {
-            const row = db.prepare('SELECT patient_snapshot_json,report_json FROM consultations WHERE id=? AND status=\'completed\'').get(id) as { patient_snapshot_json: string; report_json: string | null } | undefined;
-            if (!row || !row.report_json) return sendApiError(res, 404, 'NOT_FOUND', 'Report not found.');
-            const transcript = db.prepare('SELECT speaker,text,spoken_at FROM transcript_segments WHERE consultation_id=? ORDER BY seq').all(id) as Array<{ speaker: string; text: string; spoken_at: string | null }>;
-            return res.json({ id, patient: JSON.parse(row.patient_snapshot_json), transcript: transcript.map(segment => ({ speaker: segment.speaker, text: segment.text, timestamp: segment.spoken_at })), report: JSON.parse(row.report_json) });
-        } catch { return sendApiError(res, 500, 'INTERNAL', 'Failed to fetch report.'); }
+export function createConsultationController(db: AppDatabase, engine: ConsultationEngine = groqEngine, liveSessions = new LiveSessionManager()) {
+    const cache = new Map<string, CachedInsights>();
+    const locks = new Map<string, Promise<void>>();
+    const withLock = async <T>(id: string, action: () => Promise<T>): Promise<T> => {
+        const prior = locks.get(id) ?? Promise.resolve();
+        let release!: () => void;
+        const current = new Promise<void>(resolve => { release = resolve; });
+        const tail = prior.then(() => current);
+        locks.set(id, tail);
+        await prior;
+        try { return await action(); }
+        finally { release(); if (locks.get(id) === tail) locks.delete(id); }
     };
 
     const start = (req: Request, res: Response) => {
@@ -54,66 +34,110 @@ export function createConsultationController(db: AppDatabase) {
         if (typeof patientId !== 'string' || !patientId.trim()) return sendApiError(res, 400, 'BAD_REQUEST', 'patientId is required.');
         const patient = getPatient(db, patientId);
         if (!patient) return sendApiError(res, 404, 'NOT_FOUND', 'Patient not found.');
-        activeConsultations[patientId] = { patientId, transcript: [], doctorPrescriptions: [], extractedSymptoms: [], startedAt: new Date().toISOString() };
-        return res.json({ message: `Consultation started for patient ${patientId}`, patientId });
+        try {
+            const startedAt = new Date().toISOString();
+            const started = startConsultation(db, patient, startedAt);
+            cache.set(started.consultationId, { lastProcessedSeq: 0 });
+            return res.json({ message: `Consultation started for patient ${patientId}`, patientId, consultationId: started.consultationId,
+                startedAt, ...(started.previousInterruptedConsultationId ? { previousInterruptedConsultationId: started.previousInterruptedConsultationId } : {}) });
+        } catch { return sendApiError(res, 500, 'PERSISTENCE_FAILED', 'Consultation could not be started.'); }
     };
 
     const processChunk = async (req: Request, res: Response) => {
-        const { patientId, chunks } = req.body ?? {};
-        if (typeof patientId !== 'string' || !Array.isArray(chunks) || chunks.length === 0 || chunks.some((chunk: unknown) => !chunk || typeof chunk !== 'object' || !['doctor', 'patient'].includes((chunk as { speaker?: string }).speaker ?? '') || typeof (chunk as { text?: unknown }).text !== 'string')) {
-            return sendApiError(res, 400, 'VALIDATION_ERROR', 'patientId and a non-empty array of valid chunks are required.');
+        const { consultationId, chunks } = req.body ?? {};
+        if (typeof consultationId !== 'string' || !isValidConsultationId(consultationId)) return sendApiError(res, 400, 'VALIDATION_ERROR', 'consultationId is required.');
+        if (chunks !== undefined && (!Array.isArray(chunks) || chunks.some((chunk: unknown) => !chunk || typeof chunk !== 'object' || !['doctor', 'patient'].includes((chunk as { speaker?: string }).speaker ?? '') || typeof (chunk as { text?: unknown }).text !== 'string' || !(chunk as { text: string }).text.trim()))) {
+            return sendApiError(res, 400, 'VALIDATION_ERROR', 'chunks must contain valid manually entered text.');
         }
-        const state = activeConsultations[patientId];
-        if (!state) return sendApiError(res, 404, 'NOT_FOUND', 'Active consultation not found.');
-        const timestamp = new Date().toISOString();
-        for (const chunk of chunks as Array<{ speaker: 'doctor' | 'patient'; text: string }>) state.transcript.push({ ...chunk, timestamp });
+        return withLock(consultationId, async () => {
+            const consultation = getConsultation(db, consultationId);
+            if (!consultation) return sendApiError(res, 404, 'NOT_FOUND', 'Consultation not found.');
+            if (consultation.status !== 'active') return sendApiError(res, 409, 'CONFLICT', 'Only active consultations can be processed.');
+            try {
+                if (chunks?.length) appendTranscriptSegments(db, consultationId, chunks, 'manual');
+                const cached = cache.get(consultationId) ?? { lastProcessedSeq: 0 };
+                const available = readTranscript(db, consultationId).filter(segment => segment.seq > cached.lastProcessedSeq);
+                if (available.length === 0) return res.json({ ...(cached.data ?? emptyInsights()), consultationId, aiStatus: 'ok' as const });
+                const patient = JSON.parse(consultation.patient_snapshot_json) as Patient;
+                const newText = available.map(segment => ({ speaker: segment.speaker as 'doctor' | 'patient', text: segment.text }));
+                const result = await engine.processLiveChunk(newText, patient, cached.data);
+                const data = result.data ?? emptyInsights();
+                const response: ConsultationResponse = {
+                    soap: data.soap ?? emptyInsights().soap, alerts: data.alerts ?? [], patientSummary: data.patientSummary ?? '',
+                    suggestedQuestions: data.suggestedQuestions ?? []
+                };
+                cache.set(consultationId, { lastProcessedSeq: available[available.length - 1].seq, data: response });
+                return res.json({ ...response, consultationId, aiStatus: result.status === 'ok' ? 'ok' : 'fallback' });
+            } catch {
+                return sendApiError(res, 500, 'AI_FAILED', 'Intelligence pipeline failed.');
+            }
+        });
+    };
+
+    const recent = (req: Request, res: Response) => {
         try {
-            const patient = getPatient(db, patientId) as Patient | undefined;
-            if (!patient) return sendApiError(res, 404, 'NOT_FOUND', 'Patient not found.');
-            const insights = await groqEngine.processLiveChunk(chunks, patient, state.lastAIPushSummary);
-            const response: ConsultationResponse = {
-                soap: insights.soap || { subjective: [], objective: [], assessment: [], plan: [] },
-                alerts: insights.alerts || [], patientSummary: insights.patientSummary || '', suggestedQuestions: insights.suggestedQuestions || []
-            };
-            state.lastAIPushSummary = response;
-            return res.json(response);
-        } catch {
-            console.error('Consultation processing failed.');
-            return sendApiError(res, 500, 'AI_FAILED', 'Intelligence pipeline failed.');
-        }
+            const includeIncomplete = req.query.includeIncomplete === 'true';
+            const statuses: ConsultationStatus[] = includeIncomplete ? ['completed', 'interrupted', 'failed'] : ['completed'];
+            const rows = db.prepare(`SELECT c.id,c.patient_id,c.status,c.started_at,c.ended_at,c.patient_snapshot_json,c.report_json,p.name
+                FROM consultations c JOIN patients p ON p.id=c.patient_id WHERE c.status IN (${statuses.map(() => '?').join(',')}) ORDER BY COALESCE(c.ended_at,c.started_at) DESC`).all(...statuses) as Array<{ id: string; patient_id: string; status: ConsultationStatus; started_at: string; ended_at: string | null; patient_snapshot_json: string; report_json: string | null; name: string }>;
+            return res.json(rows.map(row => {
+                const report = JSON.parse(row.report_json ?? '{}') as { aiSummary?: { narrative?: unknown } };
+                const item = { id: row.id, patientId: row.patient_id, patientName: row.name, date: row.ended_at ?? row.started_at,
+                    summary: typeof report.aiSummary?.narrative === 'string' ? `${report.aiSummary.narrative.substring(0, 100)}...` : '' };
+                return includeIncomplete && row.status !== 'completed' ? { ...item, status: row.status } : item;
+            }));
+        } catch { return sendApiError(res, 500, 'INTERNAL', 'Failed to fetch consultations.'); }
+    };
+
+    const report = (req: Request, res: Response) => {
+        const id = req.params.id;
+        if (typeof id !== 'string' || !isValidConsultationId(id)) return sendApiError(res, 400, 'BAD_REQUEST', 'Invalid report ID.');
+        try {
+            const consultation = getConsultation(db, id);
+            if (!consultation) return sendApiError(res, 404, 'NOT_FOUND', 'Report not found.');
+            const transcript = readTranscript(db, id).map(segment => ({ speaker: segment.speaker, text: segment.text, timestamp: segment.spokenAt }));
+            const payload = { id, patient: JSON.parse(consultation.patient_snapshot_json), transcript,
+                report: consultation.report_json ? JSON.parse(consultation.report_json) : null };
+            return consultation.status === 'completed' ? res.json(payload) : res.json({ ...payload, status: consultation.status });
+        } catch { return sendApiError(res, 500, 'INTERNAL', 'Failed to fetch report.'); }
     };
 
     const end = async (req: Request, res: Response) => {
-        const patientId = req.body?.patientId;
-        const state = typeof patientId === 'string' ? activeConsultations[patientId] : undefined;
-        if (!state) return sendApiError(res, 400, 'BAD_REQUEST', 'Active consultation not found.');
-        const patient = getPatient(db, patientId) as Patient | undefined;
-        if (!patient) return sendApiError(res, 404, 'NOT_FOUND', 'Patient not found.');
-        let report: Record<string, unknown>;
-        try { report = await groqEngine.generateFinalReport(state.transcript, patient) as unknown as Record<string, unknown>; }
-        catch {
-            console.error('Final report generation failed.');
-            return sendApiError(res, 502, 'AI_FAILED', 'Failed to generate final report.');
-        }
-        const endedAt = new Date().toISOString();
-        const consultationId = `${patientId}_${Date.now()}`;
-        try {
-            const persist = db.transaction(() => {
-                db.prepare(`INSERT INTO consultations (id,patient_id,status,started_at,ended_at,patient_snapshot_json,report_json,report_status,created_via)
-                    VALUES (?,?,'completed',?,?,?,?,'generated','app')`).run(consultationId, patientId, state.startedAt, endedAt,
-                    JSON.stringify(patient), JSON.stringify(report));
-                const insertSegment = db.prepare(`INSERT INTO transcript_segments (consultation_id,seq,speaker,text,source,spoken_at)
-                    VALUES (?,?,?,?,'manual',?)`);
-                state.transcript.forEach((segment, index) => insertSegment.run(consultationId, index + 1, segment.speaker, segment.text, segment.timestamp ?? null));
-            });
-            persist();
-        } catch {
-            return sendApiError(res, 500, 'PERSISTENCE_FAILED', 'Consultation report could not be saved. Please retry.');
-        }
-        delete activeConsultations[patientId];
-        return res.json({ ...report, consultationId });
+        const consultationId = req.body?.consultationId;
+        if (typeof consultationId !== 'string' || !isValidConsultationId(consultationId)) return sendApiError(res, 400, 'VALIDATION_ERROR', 'consultationId is required.');
+        return withLock(consultationId, async () => {
+            const consultation = getConsultation(db, consultationId);
+            if (!consultation) return sendApiError(res, 404, 'NOT_FOUND', 'Consultation not found.');
+            if (consultation.status === 'completed' && consultation.report_json) return res.json({ ...JSON.parse(consultation.report_json), consultationId, status: 'completed', alreadyCompleted: true });
+            if (consultation.status === 'finalizing') return sendApiError(res, 409, 'CONFLICT', 'Consultation is already being finalized.');
+            if (!['active', 'interrupted', 'failed'].includes(consultation.status)) return sendApiError(res, 409, 'CONFLICT', 'Consultation cannot be finalized from its current state.');
+            try {
+                if (!transitionConsultation(db, consultationId, ['active', 'interrupted', 'failed'], 'finalizing')) return sendApiError(res, 409, 'CONFLICT', 'Consultation state changed. Retry the request.');
+            } catch { return sendApiError(res, 500, 'PERSISTENCE_FAILED', 'Consultation state could not be saved. Please retry.'); }
+            const drained = await liveSessions.closeAndWait(consultationId, 5000);
+            if (!drained) console.warn(`[Consultation] Deepgram flush timed out for ${consultationId}.`);
+            const current = getConsultation(db, consultationId)!;
+            const transcriptRows = readTranscript(db, consultationId);
+            const transcript = transcriptRows.map(segment => ({ speaker: segment.speaker as 'doctor' | 'patient', text: segment.text, timestamp: segment.spokenAt ?? undefined }));
+            const patient = JSON.parse(current.patient_snapshot_json) as Patient;
+            let result: EngineResult<FinalReportData>;
+            try { result = await engine.generateFinalReport(transcript, patient); }
+            catch { result = { status: 'error', reason: 'Report generation failed.' }; }
+            if (result.status !== 'ok' || !result.data) {
+                try { transitionConsultation(db, consultationId, ['finalizing'], 'failed'); } catch { /* best effort state recovery */ }
+                return sendApiError(res, 502, 'AI_FAILED', 'Final report generation failed. The consultation can be retried.', { retryable: true });
+            }
+            try {
+                if (!completeConsultation(db, consultationId, result.data)) throw new Error('Finalization state changed.');
+            } catch {
+                try { transitionConsultation(db, consultationId, ['finalizing'], 'failed'); } catch { /* leave transcript available for recovery */ }
+                return sendApiError(res, 500, 'PERSISTENCE_FAILED', 'Final report could not be saved. The consultation can be retried.', { retryable: true });
+            }
+            cache.delete(consultationId);
+            return res.json({ ...result.data, consultationId, status: 'completed' });
+        });
     };
 
-    return { getRecentConsultations: getAll, getConsultationReport: getReport, startConsultation: start,
-        processConsultationChunk: processChunk, endConsultation: end };
+    return { startConsultation: start, processConsultationChunk: processChunk, getRecentConsultations: recent,
+        getConsultationReport: report, endConsultation: end, recover: () => recoverConsultations(db) };
 }

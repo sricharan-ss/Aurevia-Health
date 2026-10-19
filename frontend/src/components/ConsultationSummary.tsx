@@ -12,6 +12,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { apiUrl } from "@/lib/config";
 import { getPatient } from "@/lib/api/patients";
+import { normalizeReport } from "@/lib/normalizeReport";
+import { RESEARCH_DISCLAIMER } from "@/lib/constants";
 
 interface ConsultationSessionData {
     transcript?: TranscriptMessage[];
@@ -24,6 +26,7 @@ interface ConsultationSessionData {
 
 interface PersistedConsultation {
     patient?: Patient;
+    transcript?: Array<{ speaker: "doctor" | "patient"; text: string; timestamp?: string | null }>;
     report?: {
         soap?: SOAPData;
         aiSummary?: {
@@ -45,6 +48,7 @@ export default function ConsultationSummary() {
     const [patient, setPatient] = useState<Patient | null>(null);
 
     const [isExporting, setIsExporting] = useState(false);
+    const [exportError, setExportError] = useState("");
     const mounted = useSyncExternalStore(subscribeHydration, getClientHydrationSnapshot, getServerHydrationSnapshot);
     const [sessionData, setSessionData] = useState<ConsultationSessionData | null>(null);
     const [isLoadingReport, setIsLoadingReport] = useState(false);
@@ -62,10 +66,11 @@ export default function ConsultationSummary() {
                     if (active) {
                         setPatient(data.patient ?? null);
                         setSessionData({ summary: data.report?.aiSummary?.narrative, soap: data.report?.soap,
+                            transcript: data.transcript?.map(segment => ({ role: segment.speaker, text: segment.text, timestamp: segment.timestamp ?? "" })),
                             medications: data.report?.aiSummary?.medications, warnings: data.report?.aiSummary?.warnings });
                     }
                 } else {
-                    const stored = sessionStorage.getItem(`session_${patientId}`);
+                    const stored = sessionStorage.getItem(`session_${reportId || patientId}`);
                     if (stored && active) setSessionData(JSON.parse(stored) as ConsultationSessionData);
                     if (patientId) {
                         const currentPatient = await getPatient(patientId);
@@ -107,6 +112,7 @@ export default function ConsultationSummary() {
 
     const generatePDF = async () => {
         setIsExporting(true);
+        setExportError("");
         try {
             const { jsPDF } = await import("jspdf");
             const autoTable = (await import("jspdf-autotable")).default;
@@ -177,7 +183,7 @@ export default function ConsultationSummary() {
                 startY: yPos + 2,
                 head: [["Category", "Details"]],
                 body: [
-                    ["Narrative", sessionData?.summary || "N/A"],
+                    ["Narrative", normalizedReport.summary || "N/A"],
                     ["Medications", currentSummary.medications.join(", ")],
                     ["Warnings", currentSummary.warnings.join(", ")]
                 ],
@@ -187,9 +193,15 @@ export default function ConsultationSummary() {
                 columnStyles: { 0: { cellWidth: 30, fontStyle: "bold" }, 1: { cellWidth: 150 } }
             });
 
+            for (let page = 1; page <= doc.getNumberOfPages(); page += 1) {
+                doc.setPage(page);
+                doc.setFontSize(7);
+                doc.setTextColor(110);
+                doc.text(RESEARCH_DISCLAIMER, 14, 290, { maxWidth: 180 });
+            }
             doc.save(`Aurevia_Summary_${patient.name.replace(/\s/g, "_")}.pdf`);
-        } catch (err) {
-            console.error("PDF generation failed:", err);
+        } catch {
+            setExportError("PDF export failed. Please try again.");
         } finally {
             setIsExporting(false);
         }
@@ -198,14 +210,11 @@ export default function ConsultationSummary() {
     if (!mounted) return null;
 
     // Render only data from this consultation; never substitute fixture content.
-    const currentSoap = sessionData?.soap || { subjective: [], objective: [], assessment: [], plan: [] };
+    const normalizedReport = normalizeReport(sessionData);
+    const currentSoap = normalizedReport.soap;
     const currentTranscript = sessionData?.transcript || [];
     const currentAlerts = sessionData?.alerts || [];
-    const currentSummary = {
-        diagnosis: sessionData?.summary ? [sessionData.summary] : [],
-        medications: sessionData?.medications || [],
-        warnings: sessionData?.warnings || []
-    };
+    const currentSummary = { diagnosis: normalizedReport.summary ? [normalizedReport.summary] : [], medications: normalizedReport.medications, warnings: normalizedReport.warnings };
 
     return (
         <div className="max-w-4xl mx-auto space-y-5">
@@ -352,6 +361,7 @@ export default function ConsultationSummary() {
             <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
                 <div className="px-5 py-3 border-b border-border">
                     <h2 className="text-sm font-semibold text-foreground">AI Summary & Logic</h2>
+                    <p className="mt-1 text-[10px] text-muted-light">{RESEARCH_DISCLAIMER}</p>
                 </div>
                 <div className="p-5 grid grid-cols-3 gap-5">
                     {/* Diagnosis */}
@@ -361,7 +371,7 @@ export default function ConsultationSummary() {
                         </p>
                         <div className="bg-primary/[0.04] border border-primary/10 rounded-lg p-3">
                             <p className="text-xs text-foreground leading-relaxed italic">
-                                &quot;{sessionData?.summary || "Direct AI summary of the interaction."}&quot;
+                                &quot;{normalizedReport.summary}&quot;
                             </p>
                         </div>
                     </div>
@@ -403,6 +413,7 @@ export default function ConsultationSummary() {
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pb-6">
+                {exportError && <p className="mr-auto self-center text-xs text-alert" role="alert">{exportError}</p>}
                 <Link
                     href="/patients"
                     className="px-4 py-2 rounded-lg text-sm font-medium text-muted hover:bg-surface border border-border transition-colors"

@@ -6,10 +6,15 @@ import patientRoutes from './routes/patients';
 import consultationRoutes from './routes/consultations';
 import { appConfig, type AppConfig, warnForMissingProviderKeys } from './config';
 import { sendApiError } from './http/errors';
-import { handleLiveStream } from './ai-engine/deepgramLive';
+import { DeepgramService, LiveSessionManager, type UpstreamFactory } from './ai-engine/deepgramLive';
 import { openDb, type AppDatabase } from './db';
+import { getConsultation, isValidConsultationId, recoverConsultations } from './db/consultations';
+import { groqEngine } from './ai-engine/groqEngine';
+import type { ConsultationEngine } from './controllers/consultationController';
 
-export function createApp(config: AppConfig = appConfig, db: AppDatabase = openDb(':memory:')) {
+export interface ServerOptions { engine?: ConsultationEngine; upstreamFactory?: UpstreamFactory; }
+
+export function createApp(config: AppConfig = appConfig, db: AppDatabase = openDb(':memory:'), engine: ConsultationEngine = groqEngine, liveSessions = new LiveSessionManager()) {
     const app = express();
 
     app.use(express.static('public'));
@@ -28,7 +33,7 @@ export function createApp(config: AppConfig = appConfig, db: AppDatabase = openD
     });
 
     app.use('/api/patients', patientRoutes(db));
-    app.use('/api/consultation', consultationRoutes(db));
+    app.use('/api/consultation', consultationRoutes(db, engine, liveSessions));
 
     app.get('/', (_req, res) => {
         res.send('Aurevia Health Backend is running.');
@@ -44,9 +49,13 @@ export function createApp(config: AppConfig = appConfig, db: AppDatabase = openD
     return app;
 }
 
-export function createApplicationServer(config: AppConfig = appConfig, db: AppDatabase = openDb()) {
-    const app = createApp(config, db);
+export function createApplicationServer(config: AppConfig = appConfig, db: AppDatabase = openDb(), options: ServerOptions = {}) {
+    const liveSessions = new LiveSessionManager();
+    const app = createApp(config, db, options.engine ?? groqEngine, liveSessions);
     const server = createHttpServer(app);
+    const deepgram = new DeepgramService(config, options.upstreamFactory);
+    const recovered = recoverConsultations(db);
+    if (recovered > 0) console.log(`[Consultation] Recovered ${recovered} unfinished consultation(s).`);
     const webSocketServer = new WebSocketServer({
         server,
         path: '/api/consultation/live',
@@ -61,12 +70,21 @@ export function createApplicationServer(config: AppConfig = appConfig, db: AppDa
     });
     server.on('close', () => { if (db.open) db.close(); });
 
-    webSocketServer.on('connection', ws => {
+    webSocketServer.on('connection', (ws, request) => {
         console.log('New WebSocket connection established for live consultation');
-        handleLiveStream(ws);
+        const consultationId = new URL(request.url ?? '/', 'http://localhost').searchParams.get('consultationId');
+        const closeInvalid = (code: number, message: string) => {
+            ws.send(JSON.stringify({ type: 'error', message }));
+            ws.close(code, message);
+        };
+        if (!consultationId || !isValidConsultationId(consultationId)) return closeInvalid(4400, 'A valid consultationId is required.');
+        const consultation = getConsultation(db, consultationId);
+        if (!consultation) return closeInvalid(4404, 'Consultation not found.');
+        if (consultation.status !== 'active') return closeInvalid(4409, 'Consultation is not active.');
+        void deepgram.handleLiveStream(ws, consultationId, db, liveSessions);
     });
 
-    return { app, server, webSocketServer };
+    return { app, server, webSocketServer, liveSessions };
 }
 
 export function startServer(): Server {

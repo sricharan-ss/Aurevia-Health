@@ -2,6 +2,9 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { openDb } = require('../src/db');
 const { applyMigrations } = require('../src/db/migrations');
+const { recoverConsultations, startConsultation } = require('../src/db/consultations');
+const { createApplicationServer } = require('../src/index');
+const { loadConfig } = require('../src/config');
 const { createPatient, createPatientSchema, updatePatient, updatePatientSchema, listPatients } = require('../src/db/patients');
 
 function withDb(run) {
@@ -52,4 +55,13 @@ test('patient status is derived from consultation rows', () => withDb(db => {
     assert.equal(listPatients(db)[0].status, 'in-progress');
     db.prepare("UPDATE consultations SET status='completed',ended_at=? WHERE id='active-one'").run(now);
     assert.equal(listPatients(db)[0].status, 'completed');
+}));
+
+test('startup recovery interrupts unfinished rows idempotently', () => withDb(db => {
+    const patient = createPatient(db, validInput);
+    const session = startConsultation(db, patient);
+    createApplicationServer(loadConfig({}), db);
+    assert.equal(db.prepare('SELECT status FROM consultations WHERE id=?').get(session.consultationId).status, 'interrupted');
+    assert.equal(recoverConsultations(db), 0);
+    assert.equal(db.prepare('SELECT status FROM consultations WHERE id=?').get(session.consultationId).status, 'interrupted');
 }));

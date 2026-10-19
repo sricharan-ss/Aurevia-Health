@@ -42,4 +42,5 @@ export interface ConsultationInsights {
     alerts: AlertData[];
     patientSummary: string;
     suggestedQuestions: string[];
+    aiStatus?: "ok" | "fallback";
 }

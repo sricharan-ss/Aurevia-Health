@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
     Clock,
     User,
@@ -21,16 +22,20 @@ interface ConsultationHistoryItem {
     patientName?: string;
     date: string;
     summary?: string;
+    status?: "completed" | "interrupted" | "failed";
 }
 
 export default function ConsultationDashboard() {
     const [consultations, setConsultations] = useState<ConsultationHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [generatingId, setGeneratingId] = useState("");
+    const [actionError, setActionError] = useState("");
+    const router = useRouter();
 
     useEffect(() => {
         console.log("[Dashboard] Fetching recent consultations...");
-        fetch(apiUrl('/api/consultation/recent'))
+        fetch(apiUrl('/api/consultation/recent?includeIncomplete=true'))
             .then(res => {
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 return res.json();
@@ -45,6 +50,17 @@ export default function ConsultationDashboard() {
                 setLoading(false);
             });
     }, []);
+
+    const generateReport = async (session: ConsultationHistoryItem) => {
+        setGeneratingId(session.id);
+        setActionError("");
+        try {
+            const response = await fetch(apiUrl('/api/consultation/end'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consultationId: session.id }) });
+            if (!response.ok) throw new Error('Report generation failed. Retry from this list.');
+            router.push(`/consultation/summary?id=${encodeURIComponent(session.id)}&patientId=${encodeURIComponent(session.patientId ?? '')}`);
+        } catch (error) { setActionError(error instanceof Error ? error.message : 'Report generation failed.'); }
+        finally { setGeneratingId(""); }
+    };
 
     const filtered = consultations.filter(c =>
         c.patientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,6 +126,7 @@ export default function ConsultationDashboard() {
                                     <div>
                                         <p className="text-sm font-bold text-foreground">{session.patientName}</p>
                                         <p className="text-xs text-muted">{session.patientId}</p>
+                                        {session.status && session.status !== "completed" && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{session.status}</span>}
                                     </div>
                                 </div>
 
@@ -131,12 +148,12 @@ export default function ConsultationDashboard() {
                                 </div>
 
                                 <div className="w-20 text-right">
-                                    <Link
+                                    {session.status && session.status !== "completed" ? <button onClick={() => void generateReport(session)} disabled={generatingId === session.id} className="text-[10px] font-medium text-primary hover:underline disabled:opacity-50">{generatingId === session.id ? "Generating..." : "Generate report"}</button> : <Link
                                         href={`/consultation/summary?patientId=${session.patientId}&id=${session.id}`}
                                         className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-card text-muted hover:text-primary hover:border-primary/30 transition-all group-hover:shadow-sm"
                                     >
                                         <ChevronRight className="w-4 h-4" />
-                                    </Link>
+                                    </Link>}
                                 </div>
                             </div>
                         ))
@@ -153,6 +170,7 @@ export default function ConsultationDashboard() {
                     )}
                 </div>
             </div>
+            {actionError && <p className="text-xs text-alert" role="alert">{actionError}</p>}
         </div>
     );
 }

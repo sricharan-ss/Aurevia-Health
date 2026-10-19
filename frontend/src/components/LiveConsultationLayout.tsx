@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { User, Clock, Square, Send, Loader2 } from "lucide-react";
 import { apiUrl } from "@/lib/config";
@@ -9,7 +9,7 @@ import type { Patient, AlertData, TranscriptMessage, SOAPData, ConsultationInsig
 import TranscriptPanel from "./TranscriptPanel";
 import CopilotPanel from "./CopilotPanel";
 import ExplainabilityModal from "./ExplainabilityModal";
-import AudioRecorder from "./AudioRecorder";
+import AudioRecorder, { type AudioRecorderHandle } from "./AudioRecorder";
 import SOAPPanel from "./SOAPPanel";
 import PatientSummaryPanel from "./PatientSummary";
 
@@ -19,6 +19,10 @@ export default function LiveConsultationLayout() {
     const patientId = searchParams.get("patientId") || "";
     const [patient, setPatient] = useState<Patient | null>(null);
     const [patientError, setPatientError] = useState("");
+    const [consultationId, setConsultationId] = useState("");
+    const [endError, setEndError] = useState("");
+    const startedForRef = useRef("");
+    const audioRecorderRef = useRef<AudioRecorderHandle>(null);
 
     const [elapsed, setElapsed] = useState(0);
     const [selectedAlert, setSelectedAlert] = useState<AlertData | null>(null);
@@ -38,15 +42,18 @@ export default function LiveConsultationLayout() {
 
     // Initialize consultation on backend after loading the canonical patient record.
     useEffect(() => {
-        if (!patient) return;
-        // Clear old summary state to prevent data bleed
-        sessionStorage.removeItem(`session_${patientId}`);
-
+        if (!patient || startedForRef.current === patientId) return;
+        startedForRef.current = patientId;
         fetch(apiUrl('/api/consultation/start'), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ patientId }),
-        }).catch(err => console.error("Failed to start consultation:", err));
+        }).then(async response => {
+            if (!response.ok) throw new Error('Consultation could not be started.');
+            const data = await response.json() as { consultationId: string; startedAt: string };
+            setConsultationId(data.consultationId);
+            sessionStorage.removeItem(`session_${data.consultationId}`);
+        }).catch(() => setEndError("Unable to start this consultation. Return to the patient list and retry."));
     }, [patient, patientId]);
 
     useEffect(() => {
@@ -66,19 +73,19 @@ export default function LiveConsultationLayout() {
     };
 
     const handleEndConsultation = async () => {
-        if (!patient) return;
+        if (!patient || !consultationId) return;
         setIsThinking(true);
+        setEndError("");
         try {
+            await audioRecorderRef.current?.stopRecording();
             const res = await fetch(apiUrl('/api/consultation/end'), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ patientId }),
+                body: JSON.stringify({ consultationId }),
             });
 
             if (res.ok) {
                 const finalData = await res.json();
-
-                // Persist session data for the summary page
                 const sessionData = {
                     transcript,
                     alerts,
@@ -87,13 +94,14 @@ export default function LiveConsultationLayout() {
                     medications: finalData.aiSummary.medications,
                     warnings: finalData.aiSummary.warnings
                 };
-                sessionStorage.setItem(`session_${patientId}`, JSON.stringify(sessionData));
-                router.push(`/consultation/summary?patientId=${patientId}&duration=${elapsed}`);
+                sessionStorage.setItem(`session_${consultationId}`, JSON.stringify(sessionData));
+                router.push(`/consultation/summary?id=${encodeURIComponent(consultationId)}&patientId=${encodeURIComponent(patientId)}&duration=${elapsed}`);
+            } else {
+                const body = await res.json().catch(() => ({})) as { error?: string };
+                setEndError(body.error || "The report could not be saved. Select End Consultation to retry.");
             }
-        } catch (err) {
-            console.error("End consultation failed:", err);
-            // Fallback: still go to summary with whatever we have
-            router.push(`/consultation/summary?patientId=${patientId}&duration=${elapsed}`);
+        } catch {
+            setEndError("The report could not be saved. Select End Consultation to retry.");
         } finally {
             setIsThinking(false);
         }
@@ -109,7 +117,7 @@ export default function LiveConsultationLayout() {
     if (!patient) return <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted">{patientError || "Loading patient..."}</div>;
 
     const handleSendMessage = async () => {
-        if (!dummyMessage.trim() || isThinking) return;
+        if (!dummyMessage.trim() || isThinking || !consultationId) return;
 
         const messageText = dummyMessage;
         setDummyMessage("");
@@ -120,7 +128,7 @@ export default function LiveConsultationLayout() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    patientId,
+                    consultationId,
                     chunks: [{
                         speaker,
                         text: messageText,
@@ -129,7 +137,7 @@ export default function LiveConsultationLayout() {
             });
 
             if (res.ok) {
-                const data = await res.json();
+                const data = await res.json() as ConsultationInsights;
                 const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 setTranscript(prev => [...prev, { role: speaker, text: messageText, timestamp }]);
                 setAlerts(data.alerts);
@@ -160,11 +168,12 @@ export default function LiveConsultationLayout() {
                     </div>
                 </div>
                 <div className="flex items-center gap-5">
-                    <AudioRecorder
-                        patientId={patientId}
+            {consultationId && <AudioRecorder
+                        ref={audioRecorderRef}
+                        consultationId={consultationId}
                         onTranscriptChunk={handleTranscriptChunk}
                         onProcessingComplete={handleProcessingComplete}
-                    />
+                    />}
 
                     <div className="flex items-center bg-surface rounded-lg p-1 border border-border/50">
                         <button
@@ -240,9 +249,11 @@ export default function LiveConsultationLayout() {
 
             {/* Sticky End Consultation button */}
             <div className="shrink-0 px-6 py-3 border-t border-border bg-card flex justify-end">
+                {endError && <p className="mr-auto self-center text-xs text-alert" role="alert">{endError}</p>}
                 <button
-                    onClick={handleEndConsultation}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-alert hover:bg-alert/90 transition-colors duration-150 cursor-pointer"
+                    onClick={() => void handleEndConsultation()}
+                    disabled={!consultationId || isThinking}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-alert hover:bg-alert/90 transition-colors duration-150 cursor-pointer disabled:opacity-60"
                 >
                     <Square className="w-3.5 h-3.5 fill-current" />
                     End Consultation

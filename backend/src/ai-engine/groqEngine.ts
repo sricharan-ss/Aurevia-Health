@@ -2,6 +2,9 @@ import Groq from "groq-sdk";
 import { Patient, ConsultationResponse, TranscriptChunk, SOAPNote } from "../types";
 import { appConfig } from "../config";
 
+export interface FinalReportData { soap: SOAPNote; aiSummary: { narrative: string; medications: string[]; warnings: string[] }; }
+export type EngineResult<T> = { status: 'ok'; data: T } | { status: 'fallback'; reason: string; data: T } | { status: 'error'; reason: string; data?: T };
+
 export class GroqEngine {
     private groq: Groq | null = null;
 
@@ -14,6 +17,7 @@ export class GroqEngine {
         if (!this.groq) {
             this.groq = new Groq({
                 apiKey: apiKey,
+                timeout: 30_000,
             });
         }
         return this.groq;
@@ -22,10 +26,10 @@ export class GroqEngine {
     /**
      * Processes a live transcript chunk to provide clinical insights using Groq
      */
-    async processLiveChunk(newChunks: TranscriptChunk[], patient: Patient, previousSummary?: ConsultationResponse): Promise<Partial<ConsultationResponse>> {
+    async processLiveChunk(newChunks: TranscriptChunk[], patient: Patient, previousSummary?: ConsultationResponse): Promise<EngineResult<Partial<ConsultationResponse>>> {
         const client = this.getClient();
         if (!client) {
-            return this.getMockLiveInsights("Groq API key missing");
+            return { status: 'fallback', reason: 'Groq API key missing', data: this.getMockLiveInsights('Groq API key missing') };
         }
 
         try {
@@ -108,7 +112,7 @@ export class GroqEngine {
             const potentialAlerts = parsed.potentialAlerts || parsed.alerts || [];
             const liveSummary = parsed.liveSummary || parsed.summary || "";
 
-            return {
+            return { status: 'ok', data: {
                 soap: parsed.soap || { subjective: [], objective: [], assessment: [], plan: [] },
                 suggestedQuestions: suggestedQuestions,
                 alerts: potentialAlerts.map((a: any, index: number) => ({
@@ -121,10 +125,10 @@ export class GroqEngine {
                     timestamp: new Date().toISOString()
                 })),
                 patientSummary: liveSummary
-            };
+            } };
         } catch {
             console.error('Groq live request failed.');
-            return this.getMockLiveInsights('Groq provider request failed');
+            return { status: 'fallback', reason: 'Groq provider request failed', data: this.getMockLiveInsights('Groq provider request failed') };
         }
     }
 
@@ -132,10 +136,10 @@ export class GroqEngine {
      * Generates a final SOAP note and narrative summary from the full transcript using Groq.
      * Includes patient context for better accuracy in medications and warnings.
      */
-    async generateFinalReport(transcript: TranscriptChunk[], patient: Patient): Promise<{ soap: SOAPNote, aiSummary: any }> {
+    async generateFinalReport(transcript: TranscriptChunk[], patient: Patient): Promise<EngineResult<FinalReportData>> {
         const client = this.getClient();
         if (!client) {
-            return this.getMockFinalReport("Groq API key missing");
+            return { status: 'fallback', reason: 'Groq API key missing', data: this.getMockFinalReport('Groq API key missing') };
         }
 
         try {
@@ -192,13 +196,10 @@ export class GroqEngine {
             const content = response.choices[0].message.content || "{}";
             const parsed = JSON.parse(content);
 
-            return {
-                soap: parsed.soap,
-                aiSummary: parsed.aiSummary
-            };
+            return { status: 'ok', data: { soap: parsed.soap, aiSummary: parsed.aiSummary } as FinalReportData };
         } catch {
             console.error('Groq final request failed.');
-            return this.getMockFinalReport('Groq provider request failed');
+            return { status: 'error', reason: 'Groq provider request failed' };
         }
     }
 
@@ -216,7 +217,7 @@ export class GroqEngine {
         };
     }
 
-    private getMockFinalReport(errStr?: string): { soap: SOAPNote, aiSummary: any } {
+    private getMockFinalReport(errStr?: string): FinalReportData {
         return {
             soap: {
                 subjective: ["Consultation finished"],

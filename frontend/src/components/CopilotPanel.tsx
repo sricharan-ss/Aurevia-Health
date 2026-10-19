@@ -4,6 +4,7 @@ import { MessageCircleQuestion, ShieldCheck, ShieldAlert } from "lucide-react";
 import AlertCard from "./AlertCard";
 
 import type { AlertData } from "@/types/clinical";
+import { RESEARCH_DISCLAIMER } from "@/lib/constants";
 
 interface CopilotPanelProps {
     alerts: AlertData[];
@@ -14,6 +15,7 @@ interface CopilotPanelProps {
 export default function CopilotPanel({ alerts, suggestedQuestions, onAlertClick }: CopilotPanelProps) {
     return (
         <div className="p-4 space-y-4 h-full">
+            <p className="text-[10px] text-muted-light">{RESEARCH_DISCLAIMER}</p>
             {/* Suggested Questions */}
             <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-border">
