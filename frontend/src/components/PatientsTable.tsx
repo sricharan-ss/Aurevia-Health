@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
-import { patients } from "@/data/mockData";
+import { listPatients } from "@/lib/api/patients";
 import type { Patient } from "@/types/clinical";
+import PatientModal from "@/components/PatientModal";
 
 type StatusFilter = "all" | "waiting" | "in-progress" | "completed";
 
@@ -23,7 +24,20 @@ const statusColors: Record<string, { dot: string; label: string }> = {
 
 export default function PatientsTable() {
     const [activeFilter, setActiveFilter] = useState<StatusFilter>("all");
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [editing, setEditing] = useState<Patient | null | undefined>(undefined);
     const router = useRouter();
+
+    const refreshPatients = useCallback(async () => {
+        setLoading(true);
+        try { setPatients(await listPatients()); setError(""); }
+        catch { setError("Unable to load patients. Check the backend connection and retry."); }
+        finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { void refreshPatients(); }, [refreshPatients]);
 
     const today = new Date().toLocaleDateString("en-US", {
         weekday: "long",
@@ -56,8 +70,10 @@ export default function PatientsTable() {
                 </div>
 
                 {/* Filter tabs */}
-                <div className="flex items-center gap-1 bg-surface rounded-lg p-1 border border-border/50">
-                    {filterTabs.map((tab) => {
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setEditing(null)} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-primary hover:bg-primary/90 transition-colors cursor-pointer">Add Patient</button>
+                    <div className="flex items-center gap-1 bg-surface rounded-lg p-1 border border-border/50">
+                        {filterTabs.map((tab) => {
                         const isActive = activeFilter === tab.id;
                         const count =
                             tab.id === "all"
@@ -81,7 +97,8 @@ export default function PatientsTable() {
                                 </span>
                             </button>
                         );
-                    })}
+                        })}
+                    </div>
                 </div>
             </div>
 
@@ -94,12 +111,13 @@ export default function PatientsTable() {
                     <span>Time</span>
                     <span className="text-right">Action</span>
                 </div>
-                {filteredPatients.length === 0 ? (
+                {loading ? <div className="px-5 py-12 text-center text-sm text-muted">Loading patients...</div> : error ? <div className="px-5 py-12 text-center text-sm text-alert">{error} <button onClick={() => void refreshPatients()} className="ml-2 text-primary underline">Retry</button></div> : null}
+                {!loading && !error && filteredPatients.length === 0 ? (
                     <div className="px-5 py-12 text-center text-sm text-muted">
                         No patients matching this filter.
                     </div>
                 ) : (
-                    filteredPatients.map((patient) => {
+                    !loading && !error && filteredPatients.map((patient) => {
                         const status = statusColors[patient.status];
                         return (
                             <div
@@ -123,6 +141,7 @@ export default function PatientsTable() {
                                     09:30
                                 </span>
                                 <span>
+                                    <button onClick={() => setEditing(patient)} className="mr-2 text-xs text-primary hover:underline">Edit</button>
                                     <button
                                         onClick={(e) => handleStartConsultation(e, patient)}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-primary hover:bg-primary/90 transition-all duration-150 cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100"
@@ -136,6 +155,7 @@ export default function PatientsTable() {
                     })
                 )}
             </div>
+            {editing !== undefined && <PatientModal patient={editing ?? undefined} onClose={() => setEditing(undefined)} onSaved={() => { setEditing(undefined); void refreshPatients(); }} />}
         </div>
     );
 }

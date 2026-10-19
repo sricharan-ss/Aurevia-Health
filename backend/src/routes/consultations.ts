@@ -1,18 +1,14 @@
 import { Router } from 'express';
-import {
-    startConsultation,
-    processConsultationChunk,
-    endConsultation,
-    getRecentConsultations,
-    getConsultationReport
-} from '../controllers/consultationController';
+import type { AppDatabase } from '../db';
+import { createConsultationController } from '../controllers/consultationController';
 
-const router = Router();
-
-router.get('/recent', getRecentConsultations);
-router.get('/report/:id', getConsultationReport);
-router.post('/start', startConsultation);
-router.post('/process', processConsultationChunk);
-router.post('/end', endConsultation);
-
-export default router;
+export default function consultationRoutes(db: AppDatabase): Router {
+    const router = Router();
+    const controller = createConsultationController(db);
+    router.get('/recent', controller.getRecentConsultations);
+    router.get('/report/:id', controller.getConsultationReport);
+    router.post('/start', controller.startConsultation);
+    router.post('/process', controller.processConsultationChunk);
+    router.post('/end', controller.endConsultation);
+    return router;
+}

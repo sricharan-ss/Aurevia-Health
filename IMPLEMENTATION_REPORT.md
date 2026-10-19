@@ -60,7 +60,18 @@ Legacy errors generally use `{ "error": "..." }`; there is no standard `code` fi
 
 ### Phase 1
 
-Not started.
+- Goal and result: COMPLETE.
+- Task checklist: P1-1 SQLite driver/configuration complete (`better-sqlite3@12.2.0`, `@types/better-sqlite3@7.6.13`); P1-2 numbered schema v1 migration complete; P1-3 patient CRUD/validation/derived status complete; P1-4 safe JSON-to-SQLite migration, dry-run, source backup/hash manifest, verification, idempotency and DB backup complete; P1-5 history/report reads and transactional completed-report persistence complete; P1-6 API-backed patients and shared Add/Edit modal complete.
+- Files changed: `.gitignore`; backend package manifests/lock; `src/db/{index,migrations,patients,jsonMigration,cli}.ts`; patient and consultation controllers/routes; server bootstrap; backend types; backend test setup and three test files; frontend `lib/api/patients.ts`, `PatientModal.tsx`, `PatientsTable.tsx`, `LiveConsultationLayout.tsx`, and `ConsultationSummary.tsx`.
+- New or changed endpoints: `POST /api/patients` (201 canonical patient); `PATCH /api/patients/:id` (partial update, immutable ID); both GET patient endpoints now read from SQLite and add derived `status`. `GET /api/consultation/recent` and `/report/:id` now read SQLite, preserving baseline list fields and report `{patient,transcript,report}` with additive `id`. `POST /api/consultation/end` persists the report, patient snapshot, and transcript in one transaction, returns additive `consultationId`, and reports `PERSISTENCE_FAILED` without dropping in-memory state on DB failure. Start/process still use the interim patient-keyed in-memory lifecycle pending Phase 2.
+- Tests added: schema migration/idempotency, patient validation/create/update/status, HTTP CRUD and migration tests (conflict reporting, orphan snapshot, malformed input leaves DB and source unchanged), report persistence/history, persistence failure/retry. Backend suite: 16 passed, 0 failed, 0 skipped.
+- Commands run: `rtk npm run typecheck` (`backend/`) PASS; `rtk npm test` (`backend/`) PASS 16/16; `rtk npm run build` (`backend/`) PASS; `rtk npm run lint` (`frontend/`) PASS; `rtk npm run build` (`frontend/`) PASS; `rtk npm run db:migrate-json -- --dry-run` PASS (6 backend + 6 frontend patient records, 11 consultation files, 64 segments, no conflicts); validation DB migration run twice PASS; `rtk npm run db:verify -- --db storage/aurevia-validation2.db` PASS; `rtk npm run db:backup -- --db storage/aurevia-validation2.db` PASS.
+- Gate results: all Phase 0 checks PASS; patient/migration/CRUD/report persistence checks PASS; fresh-copy migration and repeat run PASS; real local DB import PASS after verified backup; lint/build PASS.
+- Migration result: source union 6 patient records; 11 legacy consultations; 64 transcript segments; zero conflicts; zero orphan snapshot patients. All 11 timestamps used the filename epoch rule. Verified backup: `backend/storage/backups/pre-migration-2026-10-19T15-46-30-750Z/manifest.json`, SHA-256 `02a5cbf5b126b571ce9365c93b3aafa8d5406e546c2324a84fe21c68a952f014`. Source files remained unchanged. Backups and database are ignored under `backend/storage/`.
+- Patient shape comparison: the backend and frontend patient fields match; frontend additionally has `status`, which is derived by the API. No other frontend-only patient fields were found.
+- Issues faced: none blocking. `better-sqlite3` and its type package installed and loaded on Node 24. npm reported 11 dependency audit findings (1 low, 1 moderate, 8 high, 1 critical); unrelated package upgrades were not run. The repository tracks `backend/node_modules`; generated dependency changes will be restored before finalizing commits.
+- Deviations: frontend `mockData.ts` remains because two currently unused legacy components still import it (`Dashboard.tsx`, `ConsultationView.tsx`); the patient table, live layout, summary and report flow no longer use fixture patients or fallback model content. Migration validation uses TypeScript AST literal parsing for the frontend fixture rather than executing the module.
+- Decisions to review: patient status uses the server's local calendar date for “completed today,” so timezone and midnight boundaries follow the backend host. Authentication is still absent by design.
 
 ### Phase 2
 
@@ -72,15 +83,15 @@ Not started.
 
 ## 4. Data migration results
 
-Not started. No data files have been changed. Before migration, source JSON will be backed up with a SHA-256 manifest under a gitignored storage path and verified before any database import.
+Source counts: 6 backend patients, 6 frontend patient fixtures (union 6), 11 legacy consultation files, 64 transcript segments. Conflicts: none. Orphan snapshots: none. All consultation timestamps came from the numeric epoch embedded in each filename because no recognized report timestamp was present. Before migration the source JSON and frontend TypeScript fixture were copied into an ignored pre-migration directory and SHA-256 hashes were verified; manifest hash is recorded under Phase 1. The imported copy and then `backend/storage/aurevia.db` passed foreign-key, integrity, deep JSON round-trip, transcript order/count, and source-hash checks. `db:migrate-json` is idempotent. Rollback: stop the backend, close its SQLite handle, then restore a verified DB backup from `storage/backups/` using SQLite (or restore the saved pre-migration JSON from the same backup folder); never replace the read-only JSON source files.
 
 ## 5. Final API contract (after)
 
-Phase 0 only: `GET /`, patient list/detail, and consultation recent/report/start/process/end paths remain. Two mock multipart endpoints (`POST /api/consultation/transcribe` and `/live-transcribe`) were removed because one returned fixed invented dialogue and the other was a stub. Touched errors follow `{error,code,details?}`. Report path IDs must match `[A-Za-z0-9_-]{1,100}` and resolve under the report directory. Configured CORS origins receive `Access-Control-Allow-Origin`; other origins are denied. The live WS endpoint requires an allowed Origin when Origin is present; missing Origin remains permitted. No authentication is provided. Phases 1–3 may add contracts and this section will be extended.
+`GET /api/patients` and `GET /api/patients/:id`: same JSON patient fields, now SQLite-backed and with derived `status`. Added `POST /api/patients` (201 canonical patient) and `PATCH /api/patients/:id` (canonical updated patient). `GET /api/consultation/recent`: same `id`, `patientId`, `patientName`, `date`, `summary` keys, now completed SQLite rows. `GET /api/consultation/report/:id`: preserves `{patient,transcript,report}` and adds `id`; reads only completed DB rows. `POST /api/consultation/start`: same fields, now verifies canonical patient exists. `POST /api/consultation/process`: same response shape. `POST /api/consultation/end`: same report fields plus `consultationId`; persistence failure returns `{error,code}` and retains interim active state. Removed `POST /api/consultation/transcribe` and `/live-transcribe` during Phase 0. Existing CORS and WS Origin rules remain. Phase 2 will extend session-ID and lifecycle contracts.
 
 ## 6. Frontend change inventory
 
-Frontend inventory to date: `frontend/src/lib/config.ts` (wiring-only); `frontend/src/app/(app)/consultation/page.tsx` (wiring-only and lint-only); `frontend/src/components/AudioRecorder.tsx` (wiring-only and text-only); `frontend/src/components/LiveConsultationLayout.tsx` (wiring-only and lint-only); `frontend/src/components/ConsultationSummary.tsx` (wiring-only and lint-only); `frontend/src/components/ConsultationView.tsx`, `CopilotPanel.tsx`, `ExplainabilityModal.tsx`, `PatientSummary.tsx`, and `SOAPPanel.tsx` (lint-only); `frontend/src/types/clinical.ts` (wiring-only). No visual redesign was made.
+Frontend inventory to date: `frontend/src/lib/config.ts` (wiring-only); `frontend/src/lib/api/patients.ts` (wiring-only); `frontend/src/app/(app)/consultation/page.tsx` (wiring-only and lint-only); `frontend/src/components/AudioRecorder.tsx` (wiring-only and text-only); `frontend/src/components/LiveConsultationLayout.tsx` (wiring-only and lint-only); `frontend/src/components/ConsultationSummary.tsx` (wiring-only and lint-only); `frontend/src/components/PatientsTable.tsx` (wiring-only and new element: API patient list, status-derived filters, Add Patient button in header and Edit action per row); `frontend/src/components/PatientModal.tsx` (new element: shared create/edit modal using existing modal/input patterns); `frontend/src/components/ConsultationView.tsx`, `CopilotPanel.tsx`, `ExplainabilityModal.tsx`, `PatientSummary.tsx`, and `SOAPPanel.tsx` (lint-only); `frontend/src/types/clinical.ts` (wiring-only). The report/live/patient route flows no longer read mock patients. No visual redesign was made.
 
 ## 7. Security and privacy status
 
@@ -101,7 +112,8 @@ Baseline scripts from package manifests:
 - Backend dev: `cd backend && npm run dev`
 - Backend build: `cd backend && npm run build`
 - Backend start: `cd backend && npm start`
-- Backend test: currently a placeholder that fails; Phase 0 will replace it.
+- Backend tests: `cd backend && npm test`.
+- Database commands: `cd backend && npm run db:migrate-json -- --dry-run`, `cd backend && npm run db:migrate-json`, `cd backend && npm run db:verify`, and `cd backend && npm run db:backup`.
 - Frontend dev: `cd frontend && npm run dev`
 - Frontend build: `cd frontend && npm run build`
 - Frontend lint: `cd frontend && npm run lint`

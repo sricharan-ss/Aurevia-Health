@@ -9,6 +9,7 @@ build/
 .env.*.local
 *.env
 backend/.env
+backend/storage/
 !.env.example
 !**/.env.example
 

@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { User, Clock, Square, Send, Loader2 } from "lucide-react";
-import { patients } from "@/data/mockData";
 import { apiUrl } from "@/lib/config";
+import { getPatient } from "@/lib/api/patients";
 import type { Patient, AlertData, TranscriptMessage, SOAPData, ConsultationInsights } from "@/types/clinical";
 import TranscriptPanel from "./TranscriptPanel";
 import CopilotPanel from "./CopilotPanel";
@@ -13,17 +13,12 @@ import AudioRecorder from "./AudioRecorder";
 import SOAPPanel from "./SOAPPanel";
 import PatientSummaryPanel from "./PatientSummary";
 
-function getPatientById(id: string): Patient | undefined {
-    return patients.find((p) => p.id === id);
-}
-
-
-
 export default function LiveConsultationLayout() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const patientId = searchParams.get("patientId") || patients[0].id;
-    const patient = getPatientById(patientId) || patients[0];
+    const patientId = searchParams.get("patientId") || "";
+    const [patient, setPatient] = useState<Patient | null>(null);
+    const [patientError, setPatientError] = useState("");
 
     const [elapsed, setElapsed] = useState(0);
     const [selectedAlert, setSelectedAlert] = useState<AlertData | null>(null);
@@ -36,8 +31,14 @@ export default function LiveConsultationLayout() {
     const [speaker, setSpeaker] = useState<"doctor" | "patient">("patient");
     const [isThinking, setIsThinking] = useState(false);
 
-    // Initialize consultation on backend
     useEffect(() => {
+        if (!patientId) return;
+        getPatient(patientId).then(setPatient).catch(() => setPatientError("Unable to load this patient. Return to the patient list and try again."));
+    }, [patientId]);
+
+    // Initialize consultation on backend after loading the canonical patient record.
+    useEffect(() => {
+        if (!patient) return;
         // Clear old summary state to prevent data bleed
         sessionStorage.removeItem(`session_${patientId}`);
 
@@ -46,7 +47,7 @@ export default function LiveConsultationLayout() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ patientId }),
         }).catch(err => console.error("Failed to start consultation:", err));
-    }, [patientId]);
+    }, [patient, patientId]);
 
     useEffect(() => {
         const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
@@ -65,6 +66,7 @@ export default function LiveConsultationLayout() {
     };
 
     const handleEndConsultation = async () => {
+        if (!patient) return;
         setIsThinking(true);
         try {
             const res = await fetch(apiUrl('/api/consultation/end'), {
@@ -103,6 +105,8 @@ export default function LiveConsultationLayout() {
         setSoap(data.soap);
         setSummary(data.patientSummary);
     };
+
+    if (!patient) return <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted">{patientError || "Loading patient..."}</div>;
 
     const handleSendMessage = async () => {
         if (!dummyMessage.trim() || isThinking) return;

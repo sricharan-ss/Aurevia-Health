@@ -7,8 +7,9 @@ import consultationRoutes from './routes/consultations';
 import { appConfig, type AppConfig, warnForMissingProviderKeys } from './config';
 import { sendApiError } from './http/errors';
 import { handleLiveStream } from './ai-engine/deepgramLive';
+import { openDb, type AppDatabase } from './db';
 
-export function createApp(config: AppConfig = appConfig) {
+export function createApp(config: AppConfig = appConfig, db: AppDatabase = openDb(':memory:')) {
     const app = express();
 
     app.use(express.static('public'));
@@ -26,8 +27,8 @@ export function createApp(config: AppConfig = appConfig) {
         next();
     });
 
-    app.use('/api/patients', patientRoutes);
-    app.use('/api/consultation', consultationRoutes);
+    app.use('/api/patients', patientRoutes(db));
+    app.use('/api/consultation', consultationRoutes(db));
 
     app.get('/', (_req, res) => {
         res.send('Aurevia Health Backend is running.');
@@ -43,8 +44,8 @@ export function createApp(config: AppConfig = appConfig) {
     return app;
 }
 
-export function createApplicationServer(config: AppConfig = appConfig): { app: ReturnType<typeof createApp>; server: Server; webSocketServer: WebSocketServer } {
-    const app = createApp(config);
+export function createApplicationServer(config: AppConfig = appConfig, db: AppDatabase = openDb()) {
+    const app = createApp(config, db);
     const server = createHttpServer(app);
     const webSocketServer = new WebSocketServer({
         server,
@@ -58,6 +59,7 @@ export function createApplicationServer(config: AppConfig = appConfig): { app: R
             callback(true);
         }
     });
+    server.on('close', () => { if (db.open) db.close(); });
 
     webSocketServer.on('connection', ws => {
         console.log('New WebSocket connection established for live consultation');

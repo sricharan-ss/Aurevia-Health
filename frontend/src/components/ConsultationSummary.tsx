@@ -7,11 +7,11 @@ import {
     MessageSquare, ShieldAlert, ArrowLeft, Download,
     Loader2, AlertCircle
 } from "lucide-react";
-import { patients, soapNote, transcriptMessages, alertsData, patientSummary } from "@/data/mockData";
-import type { AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
+import type { AlertData, TranscriptMessage, SOAPData, Patient } from "@/types/clinical";
 import Link from "next/link";
 import { format } from "date-fns";
 import { apiUrl } from "@/lib/config";
+import { getPatient } from "@/lib/api/patients";
 
 interface ConsultationSessionData {
     transcript?: TranscriptMessage[];
@@ -23,6 +23,7 @@ interface ConsultationSessionData {
 }
 
 interface PersistedConsultation {
+    patient?: Patient;
     report?: {
         soap?: SOAPData;
         aiSummary?: {
@@ -39,9 +40,9 @@ const getServerHydrationSnapshot = () => false;
 
 export default function ConsultationSummary() {
     const searchParams = useSearchParams();
-    const patientId = searchParams.get("patientId") || patients[0].id;
+    const patientId = searchParams.get("patientId") || "";
     const durationSeconds = parseInt(searchParams.get("duration") || "387", 10);
-    const patient = patients.find((p) => p.id === patientId) || patients[0];
+    const [patient, setPatient] = useState<Patient | null>(null);
 
     const [isExporting, setIsExporting] = useState(false);
     const mounted = useSyncExternalStore(subscribeHydration, getClientHydrationSnapshot, getServerHydrationSnapshot);
@@ -50,28 +51,33 @@ export default function ConsultationSummary() {
 
     useEffect(() => {
         const reportId = searchParams.get("id");
-        const stored = sessionStorage.getItem(`session_${patientId}`);
-
-        if (stored) {
-            console.log("[Summary] Loading from session storage");
-            setSessionData(JSON.parse(stored) as ConsultationSessionData);
-        } else if (reportId) {
-            console.log("[Summary] Session storage empty, fetching from backend:", reportId);
+        let active = true;
+        const load = async () => {
             setIsLoadingReport(true);
-            fetch(apiUrl(`/api/consultation/report/${encodeURIComponent(reportId)}`))
-                .then(res => res.json())
-                .then((data: PersistedConsultation) => {
-                    // Adapt backend format to summary components
-                    setSessionData({
-                        summary: data.report?.aiSummary?.narrative,
-                        soap: data.report?.soap,
-                        medications: data.report?.aiSummary?.medications,
-                        warnings: data.report?.aiSummary?.warnings
-                    });
-                })
-                .catch(err => console.error("[Summary] Fetch failed:", err))
-                .finally(() => setIsLoadingReport(false));
-        }
+            try {
+                if (reportId) {
+                    const response = await fetch(apiUrl(`/api/consultation/report/${encodeURIComponent(reportId)}`));
+                    if (!response.ok) throw new Error("Report could not be loaded.");
+                    const data = await response.json() as PersistedConsultation;
+                    if (active) {
+                        setPatient(data.patient ?? null);
+                        setSessionData({ summary: data.report?.aiSummary?.narrative, soap: data.report?.soap,
+                            medications: data.report?.aiSummary?.medications, warnings: data.report?.aiSummary?.warnings });
+                    }
+                } else {
+                    const stored = sessionStorage.getItem(`session_${patientId}`);
+                    if (stored && active) setSessionData(JSON.parse(stored) as ConsultationSessionData);
+                    if (patientId) {
+                        const currentPatient = await getPatient(patientId);
+                        if (active) setPatient(currentPatient);
+                    }
+                }
+            } catch {
+                if (active) setSessionData(null);
+            } finally { if (active) setIsLoadingReport(false); }
+        };
+        void load();
+        return () => { active = false; };
     }, [patientId, searchParams]);
 
     const formatDuration = (seconds: number) => {
@@ -89,7 +95,7 @@ export default function ConsultationSummary() {
         );
     }
 
-    if (!sessionData) {
+    if (!sessionData || !patient) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-muted">
                 <AlertCircle className="w-10 h-10 mb-4 opacity-20" />
@@ -191,14 +197,14 @@ export default function ConsultationSummary() {
 
     if (!mounted) return null;
 
-    // Merge session data with mock fallbacks
-    const currentSoap = sessionData?.soap || soapNote;
-    const currentTranscript = sessionData?.transcript || transcriptMessages;
-    const currentAlerts = sessionData?.alerts || alertsData;
+    // Render only data from this consultation; never substitute fixture content.
+    const currentSoap = sessionData?.soap || { subjective: [], objective: [], assessment: [], plan: [] };
+    const currentTranscript = sessionData?.transcript || [];
+    const currentAlerts = sessionData?.alerts || [];
     const currentSummary = {
-        diagnosis: sessionData?.summary ? [sessionData.summary] : patientSummary.diagnosis,
-        medications: sessionData?.medications || patientSummary.medications,
-        warnings: sessionData?.warnings || patientSummary.warnings
+        diagnosis: sessionData?.summary ? [sessionData.summary] : [],
+        medications: sessionData?.medications || [],
+        warnings: sessionData?.warnings || []
     };
 
     return (
