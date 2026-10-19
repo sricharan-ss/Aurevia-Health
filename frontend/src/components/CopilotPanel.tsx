@@ -56,7 +56,7 @@ export default function CopilotPanel({ alerts, suggestedQuestions, onAlertClick 
                             {alerts.map((alert) => (
                                 <AlertCard
                                     key={alert.id}
-                                    alert={alert as any}
+                                    alert={alert}
                                     onClick={() => onAlertClick(alert)}
                                 />
                             ))}

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     User, Clock, CheckCircle2, Pill, AlertTriangle,
@@ -8,9 +8,34 @@ import {
     Loader2, AlertCircle
 } from "lucide-react";
 import { patients, soapNote, transcriptMessages, alertsData, patientSummary } from "@/data/mockData";
-import type { Patient, AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
+import type { AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
 import Link from "next/link";
 import { format } from "date-fns";
+import { apiUrl } from "@/lib/config";
+
+interface ConsultationSessionData {
+    transcript?: TranscriptMessage[];
+    alerts?: AlertData[];
+    soap?: SOAPData;
+    summary?: string;
+    medications?: string[];
+    warnings?: string[];
+}
+
+interface PersistedConsultation {
+    report?: {
+        soap?: SOAPData;
+        aiSummary?: {
+            narrative?: string;
+            medications?: string[];
+            warnings?: string[];
+        };
+    };
+}
+
+const subscribeHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
 
 export default function ConsultationSummary() {
     const searchParams = useSearchParams();
@@ -19,30 +44,29 @@ export default function ConsultationSummary() {
     const patient = patients.find((p) => p.id === patientId) || patients[0];
 
     const [isExporting, setIsExporting] = useState(false);
-    const [mounted, setMounted] = useState(false);
-    const [sessionData, setSessionData] = useState<any>(null);
+    const mounted = useSyncExternalStore(subscribeHydration, getClientHydrationSnapshot, getServerHydrationSnapshot);
+    const [sessionData, setSessionData] = useState<ConsultationSessionData | null>(null);
     const [isLoadingReport, setIsLoadingReport] = useState(false);
 
     useEffect(() => {
-        setMounted(true);
         const reportId = searchParams.get("id");
         const stored = sessionStorage.getItem(`session_${patientId}`);
 
         if (stored) {
             console.log("[Summary] Loading from session storage");
-            setSessionData(JSON.parse(stored));
+            setSessionData(JSON.parse(stored) as ConsultationSessionData);
         } else if (reportId) {
             console.log("[Summary] Session storage empty, fetching from backend:", reportId);
             setIsLoadingReport(true);
-            fetch(`http://localhost:3001/api/consultation/report/${reportId}`)
+            fetch(apiUrl(`/api/consultation/report/${encodeURIComponent(reportId)}`))
                 .then(res => res.json())
-                .then(data => {
+                .then((data: PersistedConsultation) => {
                     // Adapt backend format to summary components
                     setSessionData({
-                        summary: data.report.aiSummary.narrative,
-                        soap: data.report.soap,
-                        medications: data.report.aiSummary.medications,
-                        warnings: data.report.aiSummary.warnings
+                        summary: data.report?.aiSummary?.narrative,
+                        soap: data.report?.soap,
+                        medications: data.report?.aiSummary?.medications,
+                        warnings: data.report?.aiSummary?.warnings
                     });
                 })
                 .catch(err => console.error("[Summary] Fetch failed:", err))
@@ -134,7 +158,8 @@ export default function ConsultationSummary() {
                     margin: { left: 14 }
                 });
 
-                yPos = (doc as any).lastAutoTable.finalY + 8;
+                const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+                yPos = (finalY ?? yPos + 2) + 8;
             });
 
             // Summary Table
@@ -263,7 +288,7 @@ export default function ConsultationSummary() {
                     <p className="text-[11px] text-muted-light mt-0.5">{currentTranscript.length} messages captured</p>
                 </div>
                 <div className="p-5 space-y-3 max-h-80 overflow-auto">
-                    {currentTranscript.map((msg: any, i: number) => (
+                    {currentTranscript.map((msg: TranscriptMessage, i: number) => (
                         <div
                             key={i}
                             className={`flex ${msg.role === "doctor" ? "justify-end" : "justify-start"}`}
@@ -297,7 +322,7 @@ export default function ConsultationSummary() {
                     <p className="text-[11px] text-muted-light mt-0.5">{currentAlerts.length} alert(s) during consultation</p>
                 </div>
                 <div className="p-5">
-                    {currentAlerts.map((alert: any) => (
+                    {currentAlerts.map((alert: AlertData) => (
                         <div key={alert.id} className="border border-alert/20 bg-alert/[0.03] rounded-lg p-4 mb-3 last:mb-0">
                             <div className="flex items-center gap-2 mb-2">
                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-alert/10 text-alert">
@@ -330,7 +355,7 @@ export default function ConsultationSummary() {
                         </p>
                         <div className="bg-primary/[0.04] border border-primary/10 rounded-lg p-3">
                             <p className="text-xs text-foreground leading-relaxed italic">
-                                "{sessionData?.summary || "Direct AI summary of the interaction."}"
+                                &quot;{sessionData?.summary || "Direct AI summary of the interaction."}&quot;
                             </p>
                         </div>
                     </div>

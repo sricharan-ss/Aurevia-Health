@@ -67,7 +67,7 @@ export default function ExplainabilityModal({ alert, onClose }: ExplainabilityMo
                         </p>
                         <div className="bg-amber-50 border border-amber-200/60 rounded-lg px-4 py-3">
                             <p className="text-sm text-amber-900 leading-relaxed italic">
-                                "{alert.sourceSentence}"
+                                &quot;{alert.sourceSentence}&quot;
                             </p>
                         </div>
                     </div>

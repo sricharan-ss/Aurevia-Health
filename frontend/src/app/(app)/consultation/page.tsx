@@ -8,22 +8,29 @@ import {
     Plus,
     Search,
     Calendar,
-    MessageSquare,
     ClipboardList,
-    AlertCircle,
     Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { apiUrl } from "@/lib/config";
+
+interface ConsultationHistoryItem {
+    id: string;
+    patientId?: string;
+    patientName?: string;
+    date: string;
+    summary?: string;
+}
 
 export default function ConsultationDashboard() {
-    const [consultations, setConsultations] = useState<any[]>([]);
+    const [consultations, setConsultations] = useState<ConsultationHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         console.log("[Dashboard] Fetching recent consultations...");
-        fetch("http://localhost:3001/api/consultation/recent")
+        fetch(apiUrl('/api/consultation/recent'))
             .then(res => {
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 return res.json();
@@ -119,7 +126,7 @@ export default function ConsultationDashboard() {
 
                                 <div className="flex-[2]">
                                     <p className="text-xs text-muted-light line-clamp-2 leading-relaxed italic">
-                                        "{session.summary || "No summary available for this session."}"
+                                        &quot;{session.summary || "No summary available for this session."}&quot;
                                     </p>
                                 </div>
 

@@ -12,7 +12,7 @@
 
 ## 1. Executive summary (<=12 lines)
 
-Implementation is underway. This first commit records the baseline contracts and verification results before application changes. The current source has static backend patient JSON, frontend mock patient data, in-memory patient-keyed consultations, JSON report writes, a live Deepgram WebSocket path and Groq calls. Baseline backend typecheck passes; frontend lint and build fail. No phase implementation has been made yet in this baseline commit.
+Phase 0 hardening is implemented and verified. Backend configuration is centralized, HTTP and WebSocket access use the configured origin allow-list, report IDs are constrained, provider logs avoid sensitive payloads, upload-based mock transcription routes are removed, and frontend URLs use one config module. The prototype remains non-authenticated and is not suitable for public deployment. Phases 1–3 remain.
 
 ## 2. Baseline contracts and baseline checks
 
@@ -47,16 +47,16 @@ Legacy errors generally use `{ "error": "..." }`; there is no standard `code` fi
 
 ### Phase 0
 
-- Goal and result: IN PROGRESS.
-- Task checklist: P0-1 through P0-11 pending at baseline.
-- Files changed: this report only (baseline commit).
-- New or changed endpoints: none yet.
-- Tests added: none yet.
-- Commands run: listed in section 2; baseline contract/code inspection used repository source.
-- Gate results: pending.
-- Issues faced: frontend lint baseline has 20 errors/13 warnings; frontend build baseline blocked by Google Fonts network fetch.
-- Deviations: missing checkout reference docs are recorded above. The OS CIM query was denied by the environment; OS was recorded from `[System.Environment]::OSVersion.VersionString` instead.
-- Decisions to review: none yet.
+- Goal and result: COMPLETE.
+- Task checklist: P0-1 through P0-11 complete. Central config and safe examples added; CORS and WebSocket Origin validation added; HTTP body limits and standard error helper added; unsafe report path IDs rejected; sensitive request/provider logs removed; dead upload/transcription mock endpoints and unused axios/multer dependencies removed; frontend API/WS URLs centralized; baseline lint issues corrected; deterministic offline config, path, CORS and WebSocket tests added.
+- Files changed: root/backend ignore files; backend README and package files; backend config, errors, server, consultation/patient controllers, consultation routes, Deepgram/Groq adapters; removed `backend/src/ai-engine/transcription.ts`; backend tests; frontend config and env example; consultation page, AudioRecorder, ConsultationSummary, ConsultationView, CopilotPanel, ExplainabilityModal, LiveConsultationLayout, PatientSummary, SOAPPanel, and clinical types; this report.
+- New or changed endpoints: removed `POST /api/consultation/transcribe` and `POST /api/consultation/live-transcribe`; existing HTTP success response shapes retained. Errors now use `{error,code,details?}` in touched paths. CORS is restricted to configured origins. WS accepts missing Origin for non-browser/local clients and rejects unlisted Origins. See section 5 for final contract.
+- Tests added: six deterministic `node:test` cases; all passed, with no live provider calls.
+- Commands run: `rtk npm run typecheck` (`backend/`) PASS; `rtk npm run build` (`backend/`) PASS; `rtk npm test` (`backend/`) PASS 6/6 (requires loopback outside sandbox); `rtk npm run lint` (`frontend/`) PASS; `rtk npm run build` (`frontend/`) PASS.
+- Gate results: backend typecheck/build PASS; tests PASS 6, FAIL 0, SKIPPED 0; frontend lint PASS; frontend build PASS.
+- Issues faced: sandboxed loopback tests initially failed with `EACCES`; rerun with approved elevated local loopback access passed. A `tsx` install attempt failed with `ENOTFOUND registry.npmjs.org`; no dependency was added because `ts-node` already existed through `ts-node-dev`, so the test runner uses `ts-node/register`. A first frontend build encountered a stale/running build lock; a later build completed successfully. `.env` files were not read or modified.
+- Deviations: removed the obsolete mock multipart transcription endpoints and their dead implementation as directed; no live speech transcription was replaced. No visual redesign. Existing `ts-node` made a new TS runner unnecessary.
+- Decisions to review: no blocking decisions.
 
 ### Phase 1
 
@@ -76,15 +76,15 @@ Not started. No data files have been changed. Before migration, source JSON will
 
 ## 5. Final API contract (after)
 
-Pending. Section 2 is the baseline contract; additive and breaking differences will be listed here after implementation.
+Phase 0 only: `GET /`, patient list/detail, and consultation recent/report/start/process/end paths remain. Two mock multipart endpoints (`POST /api/consultation/transcribe` and `/live-transcribe`) were removed because one returned fixed invented dialogue and the other was a stub. Touched errors follow `{error,code,details?}`. Report path IDs must match `[A-Za-z0-9_-]{1,100}` and resolve under the report directory. Configured CORS origins receive `Access-Control-Allow-Origin`; other origins are denied. The live WS endpoint requires an allowed Origin when Origin is present; missing Origin remains permitted. No authentication is provided. Phases 1–3 may add contracts and this section will be extended.
 
 ## 6. Frontend change inventory
 
-No frontend files have been changed yet. Each later frontend file will be listed with its `wiring-only`, `new element`, `text-only`, or `lint-only` classification.
+Frontend inventory to date: `frontend/src/lib/config.ts` (wiring-only); `frontend/src/app/(app)/consultation/page.tsx` (wiring-only and lint-only); `frontend/src/components/AudioRecorder.tsx` (wiring-only and text-only); `frontend/src/components/LiveConsultationLayout.tsx` (wiring-only and lint-only); `frontend/src/components/ConsultationSummary.tsx` (wiring-only and lint-only); `frontend/src/components/ConsultationView.tsx`, `CopilotPanel.tsx`, `ExplainabilityModal.tsx`, `PatientSummary.tsx`, and `SOAPPanel.tsx` (lint-only); `frontend/src/types/clinical.ts` (wiring-only). No visual redesign was made.
 
 ## 7. Security and privacy status
 
-Baseline only: no authentication; wildcard CORS; no WebSocket Origin check; consultation JSON and uploads use local plaintext paths; request/provider logs can include sensitive content. This prototype is not suitable for public deployment or real patient data. Phase changes will not add authentication or claim production security.
+No authentication; this prototype is not suitable for public deployment. HTTP CORS and browser WebSocket Origin checks are allow-listed but do not authenticate clients. API logs contain route/method/timestamp only. Provider output and transcript content are not logged by the touched paths. No live provider was called. Patient source JSON and consultation backup files remain unmodified.
 
 ## 8. Known problems and technical debt
 

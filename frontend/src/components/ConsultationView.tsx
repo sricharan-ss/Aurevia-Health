@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import type { Patient, TranscriptMessage, SOAPData, AlertData } from "@/types/clinical";
+import type { Patient, AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
 import { alertsData } from "@/data/mockData";
 import PatientSnapshot from "./PatientSnapshot";
 import SOAPPanel from "./SOAPPanel";
@@ -17,9 +17,9 @@ interface ConsultationViewProps {
 
 export default function ConsultationView({ patient }: ConsultationViewProps) {
     const [selectedAlert, setSelectedAlert] = useState<AlertData | null>(null);
-    const [messages, setMessages] = useState<TranscriptMessage[]>([]);
-    const [soapData, setSoapData] = useState<SOAPData | null>(null);
-    const [summary, setSummary] = useState<string>("");
+    const messages: TranscriptMessage[] = [];
+    const soapData: SOAPData | null = null;
+    const summary = "";
 
     return (
         <div className="max-w-[1400px]">

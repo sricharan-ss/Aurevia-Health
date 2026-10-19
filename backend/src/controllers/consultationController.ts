@@ -1,20 +1,27 @@
 import { Request, Response } from 'express';
 import { Patient, ConsultationState, ConsultationResponse } from '../types';
 import patientsData from '../data/patients.json';
-import { checkDrugInteractions } from '../ai-engine/drugInteractions';
-import { transcribeAudio } from '../ai-engine/transcription';
-import { deepgramService } from '../ai-engine/deepgramLive';
 import fs from 'fs';
 
 import { groqEngine } from '../ai-engine/groqEngine';
 import path from 'path';
+import { sendApiError } from '../http/errors';
 
 // In-memory state tracking per patient
 const activeConsultations: Record<string, ConsultationState> = {};
 
+export function resolveReportPath(directory: string, id: string): string | null {
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) return null;
+    const basePath = path.resolve(directory);
+    const reportPath = path.resolve(basePath, `${id}.json`);
+    const relativePath = path.relative(basePath, reportPath);
+    if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) return null;
+    return reportPath;
+}
+
 export const startConsultation = (req: Request, res: Response) => {
     const { patientId } = req.body;
-    if (!patientId) return res.status(400).json({ error: 'patientId is required' });
+    if (!patientId) return sendApiError(res, 400, 'BAD_REQUEST', 'patientId is required.');
 
     activeConsultations[patientId] = {
         patientId,
@@ -29,7 +36,7 @@ export const processConsultationChunk = async (req: Request, res: Response) => {
     const { patientId, chunks } = req.body;
 
     if (!patientId || !chunks || !Array.isArray(chunks) || chunks.length === 0) {
-        return res.status(400).json({ error: 'patientId and an array of chunks are required' });
+        return sendApiError(res, 400, 'VALIDATION_ERROR', 'patientId and a non-empty array of chunks are required.');
     }
 
     if (!activeConsultations[patientId]) {
@@ -55,7 +62,7 @@ export const processConsultationChunk = async (req: Request, res: Response) => {
     try {
         const patient = (patientsData as Patient[]).find(p => p.id === patientId);
         if (!patient) {
-            return res.status(404).json({ error: 'Patient not found' });
+            return sendApiError(res, 404, 'NOT_FOUND', 'Patient not found.');
         }
 
         // Run Groq Intelligence - INCREMENTAL/DELTA MODE
@@ -74,44 +81,8 @@ export const processConsultationChunk = async (req: Request, res: Response) => {
 
         res.json(response);
     } catch (err) {
-        console.error("Pipeline breakdown:", err);
-        res.status(500).json({ error: "Intelligence pipeline failed" });
-    }
-};
-
-export const transcribeAudioUpload = async (req: Request, res: Response) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No audio file uploaded.' });
-    }
-
-    try {
-        const filePath = req.file.path;
-        const transcript = await transcribeAudio(filePath);
-        res.json({ transcript });
-    } catch (error) {
-        console.error('Transcription error:', error);
-        res.status(500).json({ error: 'Transcription failed', fallback: true });
-    }
-};
-
-export const liveTranscribe = async (req: Request, res: Response) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No audio provided.' });
-    }
-
-    try {
-        const audioBuffer = fs.readFileSync(req.file.path);
-        const transcript = await deepgramService.transcribeLive(audioBuffer);
-
-        // Cleanup temp file
-        if (fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
-
-        res.json({ transcript });
-    } catch (error) {
-        console.error('Deepgram live transcription error:', error);
-        res.status(500).json({ error: 'Deepgram transcription failed', fallback: true });
+        console.error('Consultation processing failed.');
+        sendApiError(res, 500, 'AI_FAILED', 'Intelligence pipeline failed.');
     }
 };
 
@@ -119,15 +90,11 @@ export const getRecentConsultations = async (req: Request, res: Response) => {
     try {
         const reportDir = './src/data/consultations';
         const absolutePath = path.resolve(reportDir);
-        console.log(`[Recent] Scanning directory: ${absolutePath}`);
-
         if (!fs.existsSync(reportDir)) {
-            console.log(`[Recent] Directory does not exist: ${absolutePath}`);
             return res.json([]);
         }
 
         const files = fs.readdirSync(reportDir);
-        console.log(`[Recent] Found ${files.length} files:`, files);
 
         const consultations = files
             .filter(f => f.endsWith('.json'))
@@ -144,7 +111,7 @@ export const getRecentConsultations = async (req: Request, res: Response) => {
                         summary: content.report?.aiSummary?.narrative?.substring(0, 100) + "..."
                     };
                 } catch (parseErr) {
-                    console.error(`[Recent] Error parsing ${f}:`, parseErr);
+                    console.error('[Recent] Failed to parse a consultation record.');
                     return null;
                 }
             })
@@ -153,32 +120,36 @@ export const getRecentConsultations = async (req: Request, res: Response) => {
 
         res.json(consultations);
     } catch (err) {
-        console.error("[Recent] Failed to fetch consultations:", err);
-        res.status(500).json({ error: "Failed to fetch consultations" });
+        console.error('[Recent] Failed to fetch consultations.');
+        sendApiError(res, 500, 'INTERNAL', 'Failed to fetch consultations.');
     }
 };
 
 export const getConsultationReport = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const filePath = `./src/data/consultations/${id}.json`;
+        if (typeof id !== 'string') return sendApiError(res, 400, 'BAD_REQUEST', 'Invalid report ID.');
+        const reportDir = path.resolve('./src/data/consultations');
+        const filePath = resolveReportPath(reportDir, id);
+
+        if (!filePath) return sendApiError(res, 400, 'BAD_REQUEST', 'Invalid report ID.');
 
         if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ error: "Report not found" });
+            return sendApiError(res, 404, 'NOT_FOUND', 'Report not found.');
         }
 
         const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         res.json(content);
     } catch (err) {
-        console.error("[Report] Failed to fetch report:", err);
-        res.status(500).json({ error: "Failed to fetch report" });
+        console.error('[Report] Failed to fetch consultation report.');
+        sendApiError(res, 500, 'INTERNAL', 'Failed to fetch report.');
     }
 };
 
 export const endConsultation = async (req: Request, res: Response) => {
     const { patientId } = req.body;
     if (!patientId || !activeConsultations[patientId]) {
-        return res.status(400).json({ error: 'Active consultation not found' });
+        return sendApiError(res, 400, 'BAD_REQUEST', 'Active consultation not found.');
     }
 
     const state = activeConsultations[patientId];
@@ -186,7 +157,7 @@ export const endConsultation = async (req: Request, res: Response) => {
     try {
         const patient = (patientsData as Patient[]).find(p => p.id === patientId);
         if (!patient) {
-            return res.status(404).json({ error: 'Patient not found' });
+            return sendApiError(res, 404, 'NOT_FOUND', 'Patient not found.');
         }
 
         const report = await groqEngine.generateFinalReport(state.transcript, patient);
@@ -202,9 +173,9 @@ export const endConsultation = async (req: Request, res: Response) => {
                 transcript: state.transcript,
                 report
             }, null, 2));
-            console.log(`[Controller] Saved final report: ${filename}`);
+            console.log('[Controller] Saved final consultation report.');
         } catch (saveErr) {
-            console.error("Failed to persist report:", saveErr);
+            console.error('Failed to persist consultation report.');
         }
 
         // Final cleanup
@@ -212,7 +183,7 @@ export const endConsultation = async (req: Request, res: Response) => {
 
         res.json(report);
     } catch (err) {
-        console.error("Final report generation failed:", err);
-        res.status(500).json({ error: "Failed to generate final report" });
+        console.error('Final report generation failed.');
+        sendApiError(res, 500, 'AI_FAILED', 'Failed to generate final report.');
     }
 };

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { User, Clock, Radio, Square, Send, Loader2 } from "lucide-react";
+import { User, Clock, Square, Send, Loader2 } from "lucide-react";
 import { patients } from "@/data/mockData";
-import type { Patient, AlertData, TranscriptMessage, SOAPData } from "@/types/clinical";
+import { apiUrl } from "@/lib/config";
+import type { Patient, AlertData, TranscriptMessage, SOAPData, ConsultationInsights } from "@/types/clinical";
 import TranscriptPanel from "./TranscriptPanel";
 import CopilotPanel from "./CopilotPanel";
 import ExplainabilityModal from "./ExplainabilityModal";
@@ -29,7 +30,7 @@ export default function LiveConsultationLayout() {
     const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
     const [alerts, setAlerts] = useState<AlertData[]>([]);
     const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
-    const [soap, setSoap] = useState<any>(null);
+    const [soap, setSoap] = useState<SOAPData | null>(null);
     const [summary, setSummary] = useState<string>("");
     const [dummyMessage, setDummyMessage] = useState("");
     const [speaker, setSpeaker] = useState<"doctor" | "patient">("patient");
@@ -40,7 +41,7 @@ export default function LiveConsultationLayout() {
         // Clear old summary state to prevent data bleed
         sessionStorage.removeItem(`session_${patientId}`);
 
-        fetch("http://localhost:3001/api/consultation/start", {
+        fetch(apiUrl('/api/consultation/start'), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ patientId }),
@@ -66,7 +67,7 @@ export default function LiveConsultationLayout() {
     const handleEndConsultation = async () => {
         setIsThinking(true);
         try {
-            const res = await fetch("http://localhost:3001/api/consultation/end", {
+            const res = await fetch(apiUrl('/api/consultation/end'), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ patientId }),
@@ -96,8 +97,8 @@ export default function LiveConsultationLayout() {
         }
     };
 
-    const handleProcessingComplete = (data: any) => {
-        setAlerts(data.alerts);
+    const handleProcessingComplete = (data: ConsultationInsights) => {
+        setAlerts(data.alerts ?? []);
         setSuggestedQuestions(data.suggestedQuestions);
         setSoap(data.soap);
         setSummary(data.patientSummary);
@@ -111,7 +112,7 @@ export default function LiveConsultationLayout() {
         setIsThinking(true);
 
         try {
-            const res = await fetch("http://localhost:3001/api/consultation/process", {
+            const res = await fetch(apiUrl('/api/consultation/process'), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -157,7 +158,6 @@ export default function LiveConsultationLayout() {
                 <div className="flex items-center gap-5">
                     <AudioRecorder
                         patientId={patientId}
-                        role={speaker}
                         onTranscriptChunk={handleTranscriptChunk}
                         onProcessingComplete={handleProcessingComplete}
                     />
@@ -248,7 +248,7 @@ export default function LiveConsultationLayout() {
             {/* Modal */}
             {selectedAlert && (
                 <ExplainabilityModal
-                    alert={selectedAlert as any}
+                    alert={selectedAlert}
                     onClose={() => setSelectedAlert(null)}
                 />
             )}

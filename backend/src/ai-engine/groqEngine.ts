@@ -1,11 +1,12 @@
 import Groq from "groq-sdk";
 import { Patient, ConsultationResponse, TranscriptChunk, SOAPNote } from "../types";
+import { appConfig } from "../config";
 
 export class GroqEngine {
     private groq: Groq | null = null;
 
     private getClient(): Groq | null {
-        const apiKey = process.env.GROQ_API_KEY;
+        const apiKey = appConfig.groqApiKey;
         if (!apiKey || apiKey === 'YOUR_GROQ_KEY_HERE') {
             return null;
         }
@@ -28,7 +29,7 @@ export class GroqEngine {
         }
 
         try {
-            const modelName = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+            const modelName = appConfig.groqModel;
             const transcriptDelta = newChunks.map(t => `${t.speaker.toUpperCase()}: ${t.text}`).join("\n");
 
             // ARCHITECTURAL PROTECTION: Check if the summary is getting too long (> 250 words)
@@ -100,8 +101,6 @@ export class GroqEngine {
             });
 
             const content = response.choices[0].message.content || "{}";
-            console.log(`[GroqEngine] Raw Response (${modelName}):`, content);
-
             const parsed = JSON.parse(content);
 
             // Normalize response fields (AI sometimes uses different keys)
@@ -123,9 +122,9 @@ export class GroqEngine {
                 })),
                 patientSummary: liveSummary
             };
-        } catch (err: any) {
-            console.error("Groq Error (Live):", err);
-            return this.getMockLiveInsights(err.toString());
+        } catch {
+            console.error('Groq live request failed.');
+            return this.getMockLiveInsights('Groq provider request failed');
         }
     }
 
@@ -140,7 +139,7 @@ export class GroqEngine {
         }
 
         try {
-            const modelName = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+            const modelName = appConfig.groqModel;
             const transcriptText = transcript.map(t => `${t.speaker.toUpperCase()}: ${t.text}`).join("\n");
 
             const patientContext = `
@@ -197,9 +196,9 @@ export class GroqEngine {
                 soap: parsed.soap,
                 aiSummary: parsed.aiSummary
             };
-        } catch (err: any) {
-            console.error("Groq Error (Final):", err);
-            return this.getMockFinalReport(err.toString());
+        } catch {
+            console.error('Groq final request failed.');
+            return this.getMockFinalReport('Groq provider request failed');
         }
     }
 

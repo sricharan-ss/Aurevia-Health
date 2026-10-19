@@ -2,6 +2,8 @@
 
 import React, { useState, useRef } from "react";
 import { Mic, Square, Loader2 } from "lucide-react";
+import { apiUrl, wsUrl } from "@/lib/config";
+import type { ConsultationInsights } from "@/types/clinical";
 
 interface TranscriptChunk {
     speaker: "doctor" | "patient";
@@ -10,12 +12,11 @@ interface TranscriptChunk {
 
 interface AudioRecorderProps {
     patientId: string;
-    role: "doctor" | "patient";
     onTranscriptChunk: (chunk: { speaker: "doctor" | "patient", text: string }) => void;
-    onProcessingComplete: (data: any) => void;
+    onProcessingComplete: (data: ConsultationInsights) => void;
 }
 
-export default function AudioRecorder({ patientId, role, onTranscriptChunk, onProcessingComplete }: AudioRecorderProps) {
+export default function AudioRecorder({ patientId, onTranscriptChunk, onProcessingComplete }: AudioRecorderProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -30,7 +31,7 @@ export default function AudioRecorder({ patientId, role, onTranscriptChunk, onPr
             mediaRecorderRef.current = mediaRecorder;
 
             // Open WebSocket to Backend
-            const socket = new WebSocket('ws://localhost:3001/api/consultation/live');
+            const socket = new WebSocket(wsUrl('/api/consultation/live'));
             socketRef.current = socket;
 
             socket.onopen = () => {
@@ -92,7 +93,7 @@ export default function AudioRecorder({ patientId, role, onTranscriptChunk, onPr
         chunkBufferRef.current = [];
 
         try {
-            const res = await fetch("http://localhost:3001/api/consultation/process", {
+            const res = await fetch(apiUrl('/api/consultation/process'), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -102,7 +103,7 @@ export default function AudioRecorder({ patientId, role, onTranscriptChunk, onPr
             });
 
             if (res.ok) {
-                const data = await res.json();
+                const data = await res.json() as ConsultationInsights;
                 onProcessingComplete(data);
             }
         } catch (err) {
@@ -134,7 +135,7 @@ export default function AudioRecorder({ patientId, role, onTranscriptChunk, onPr
             {(isRecording || isProcessing) && (
                 <span className="text-[10px] text-alert font-bold tracking-tight animate-pulse uppercase flex items-center gap-2">
                     {isProcessing && <Loader2 className="w-3 h-3 animate-spin" />}
-                    {isProcessing ? "Gemini Reasoning..." : "Ambient Listening..."}
+                    {isProcessing ? "AI is analyzing the conversation..." : "Ambient Listening..."}
                 </span>
             )}
         </div>

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { ClipboardList, Stethoscope, Brain, ListChecks } from "lucide-react";
 
 import type { SOAPData } from "@/types/clinical";
@@ -10,20 +9,12 @@ interface SOAPPanelProps {
 }
 
 export default function SOAPPanel({ data }: SOAPPanelProps) {
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
     const currentData = data || {
         subjective: ["Waiting for patient input..."],
         objective: ["Awaiting examination details..."],
         assessment: ["Pending analysis..."],
         plan: ["Awaiting clinical decisions..."]
     };
-
-    if (!mounted) return null;
 
     const sections = [
         {

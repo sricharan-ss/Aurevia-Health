@@ -39,3 +39,7 @@ npm install
 npm run dev
 \`\`\`
 Server starts on port \`3001\`.
+
+## Local request security
+
+The backend allows browser requests only from the comma-separated `FRONTEND_ORIGINS` setting and checks a present `Origin` header on WebSocket upgrades. A missing WebSocket Origin is allowed for non-browser clients. CORS and Origin checks do not replace authentication; this local prototype has no authentication and must not be exposed publicly.

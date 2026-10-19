@@ -1,18 +1,8 @@
 import WebSocket from 'ws';
-import { TranscriptChunk } from '../types';
+import { appConfig, type AppConfig } from '../config';
 
 export class DeepgramService {
-    private apiKey: string | undefined;
-
-    constructor() {
-        this.apiKey = process.env.DEEPGRAM_API_KEY;
-    }
-
-    private getMockTranscript(role: "doctor" | "patient"): TranscriptChunk[] {
-        return [
-            { speaker: role, text: "Consultation is currently in mock mode because Deepgram API Key is missing." }
-        ];
-    }
+    constructor(private readonly config: AppConfig = appConfig) {}
 
     /**
      * Handles a live WebSocket stream from the frontend
@@ -20,10 +10,10 @@ export class DeepgramService {
      */
     public handleLiveStream(clientWs: WebSocket) {
         console.log("[Deepgram] Received client connection request");
-        const isRealKey = this.apiKey && this.apiKey !== 'YOUR_KEY_HERE';
+        const apiKey = this.config.deepgramApiKey;
+        const isRealKey = apiKey && apiKey !== 'YOUR_KEY_HERE';
 
         if (!isRealKey) {
-            console.warn("Deepgram API Key missing or invalid. Falling back to mock.");
             // Send a mock message initially
             clientWs.send(JSON.stringify({
                 type: 'transcript',
@@ -36,7 +26,7 @@ export class DeepgramService {
         const deepgramUrl = 'wss://api.deepgram.com/v1/listen?model=nova-2&diarize=true&punctuate=true&smart_format=true&interim_results=false&endpointing=300';
         const deepgramWs = new WebSocket(deepgramUrl, {
             headers: {
-                Authorization: `Token ${this.apiKey}`
+                Authorization: `Token ${apiKey}`
             }
         });
 
@@ -81,8 +71,6 @@ export class DeepgramService {
 
                         const mappedRole = speakerMap[rawSpeakerId] || "patient";
 
-                        console.log(`[Deepgram] Transcript received: [${mappedRole}] ${transcript}`);
-
                         clientWs.send(JSON.stringify({
                             type: 'transcript',
                             chunk: {
@@ -92,18 +80,20 @@ export class DeepgramService {
                         }));
                     }
                 }
-            } catch (err) {
-                console.error("[Deepgram] Error parsing Deepgram message:", err);
+            } catch {
+                console.error('[Deepgram] Failed to parse upstream message.');
             }
         });
 
-        deepgramWs.on('error', (err) => {
-            console.error("Deepgram WebSocket Error:", err);
-            clientWs.send(JSON.stringify({ type: 'error', message: 'Deepgram connection failed' }));
+        deepgramWs.on('error', () => {
+            console.error('Deepgram WebSocket connection failed.');
+            if (clientWs.readyState === WebSocket.OPEN) {
+                clientWs.send(JSON.stringify({ type: 'error', message: 'Deepgram connection failed' }));
+            }
         });
 
         deepgramWs.on('close', (code, reason) => {
-            console.log(`[Deepgram] Connection closed. Code: ${code}, Reason: ${reason}`);
+            console.log(`[Deepgram] Connection closed. Code: ${code}`);
             clientWs.close();
         });
 
@@ -122,7 +112,7 @@ export class DeepgramService {
                     console.warn(`[Deepgram] Received audio but Deepgram WS state is ${deepgramWs.readyState}`);
                 }
             } else {
-                console.log(`[Deepgram] Received non-binary message from client: ${message.toString()}`);
+                console.log('[Deepgram] Ignored non-binary client message.');
             }
         });
 
@@ -136,11 +126,6 @@ export class DeepgramService {
         });
     }
 
-    // Keep the old method for backward compatibility if needed, but we'll focus on the new stream handler
-    async transcribeLive(audioBuffer: Buffer): Promise<TranscriptChunk[]> {
-        // ... (legacy implementation)
-        return [];
-    }
 }
 
 export const deepgramService = new DeepgramService();

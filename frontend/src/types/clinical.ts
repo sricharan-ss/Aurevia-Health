@@ -23,8 +23,8 @@ export interface AlertData {
     type: "drug-interaction" | "allergy" | "lab-critical" | string;
     title: string;
     severity: "high" | "medium" | "low";
-    sourceSentence: string;
-    medications: string[];
+    sourceSentence?: string;
+    medications?: string[];
     reasoning: string;
     confidence: "High" | "Medium" | "Low";
     timestamp: string;
@@ -35,4 +35,11 @@ export interface SOAPData {
     objective: string[];
     assessment: string[];
     plan: string[];
+}
+
+export interface ConsultationInsights {
+    soap: SOAPData;
+    alerts: AlertData[];
+    patientSummary: string;
+    suggestedQuestions: string[];
 }
